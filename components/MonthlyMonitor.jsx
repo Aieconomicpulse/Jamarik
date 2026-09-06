@@ -12,23 +12,23 @@ import {
   YAxis,
 } from "recharts";
 import { money } from "@/lib/format";
-import { Panel, PanelHead, Stat, Eyebrow } from "@/components/ui";
+import { Disclosure, Metric, Panel, PanelHead } from "@/components/ui";
 import DemoBanner from "@/components/DemoBanner";
 
 // Categorical series colours, in fixed slot order — validated for CVD
-// separation and contrast against the #16130d chart surface. Never cycle these:
+// separation and contrast against the white chart surface. Never cycle these:
 // a seventh series folds into "Other" rather than reusing slot 1.
 export const SERIES = [
-  "#3987e5",
-  "#d95926",
-  "#199e70",
-  "#c98500",
-  "#d55181",
-  "#008300",
+  "#1f6bc4",
+  "#b8431a",
+  "#0f7550",
+  "#8f6100",
+  "#b23a68",
+  "#2c6b2c",
 ];
 
 const AXIS = "#7c7563";
-const GRID = "rgba(57,52,42,0.9)";
+const GRID = "rgba(222,217,202,0.9)";
 const MAX_SERIES = 6;
 
 export default function MonthlyMonitor({ data }) {
@@ -53,27 +53,18 @@ export default function MonthlyMonitor({ data }) {
     <div>
       {meta.demo && <DemoBanner />}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Stat
-          label="Reported to Lebanon"
-          value={money(grandTotal)}
-          sub={`${months[0]} → ${months[months.length - 1]} · fast publishers only`}
-        />
-        <Stat
-          label="Publishing partners"
-          value={String(partners.length)}
-          sub="China, Türkiye, UAE, Russia not yet published"
-        />
-        <Stat
-          label="Top corridor"
-          value={groups[0]?.label ?? "—"}
-          sub={`${money(groups[0]?.total)} over the window`}
-        />
-        <Stat
-          label="Top partner"
-          value={partners[0]?.name ?? "—"}
-          sub={`${money(partners[0]?.total)} reported shipped`}
-        />
+      <div className="pb-7 mb-7 border-b border-rule">
+        <p className="text-[13px] text-slate1 leading-relaxed max-w-2xl mb-6">
+          Lebanon&apos;s own submissions lag by a year or more, so this is the only current
+          view of what is physically moving toward Lebanese ports — an early-warning line on
+          corridors before they ever reach the mirror table.
+        </p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-5">
+          <Metric label="Reported to Lebanon" value={money(grandTotal)} tone="gold" />
+          <Metric label="Window" value={`${months[0]} → ${months[months.length - 1]}`} />
+          <Metric label="Publishing partners" value={`${partners.length} of 16`} />
+          <Metric label="Top corridor" value={groups[0]?.label ?? "—"} />
+        </div>
       </div>
 
       <Panel className="mb-6">
@@ -101,23 +92,23 @@ export default function MonthlyMonitor({ data }) {
                 tickFormatter={(v) => `$${v}M`}
               />
               <Tooltip
-                cursor={{ stroke: "#a59e8c", strokeDasharray: "3 3" }}
+                cursor={{ stroke: "#7c7563", strokeDasharray: "3 3" }}
                 contentStyle={{
-                  background: "#211d15",
-                  border: "1px solid #39342a",
+                  background: "#ffffff",
+                  border: "1px solid #ded9ca",
                   borderRadius: 0,
                   fontSize: 12,
                   fontFamily: "IBM Plex Mono, monospace",
                 }}
-                labelStyle={{ color: "#a59e8c" }}
-                itemStyle={{ color: "#f3eee2" }}
+                labelStyle={{ color: "#6b6555" }}
+                itemStyle={{ color: "#16130d" }}
                 formatter={(v, name) => [`$${v}M`, name]}
               />
               <Legend
                 wrapperStyle={{
                   fontSize: 11,
                   fontFamily: "IBM Plex Mono, monospace",
-                  color: "#a59e8c",
+                  color: "#6b6555",
                   paddingTop: 10,
                 }}
               />
@@ -129,7 +120,7 @@ export default function MonthlyMonitor({ data }) {
                   stroke={SERIES[i]}
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 4, strokeWidth: 2, stroke: "#16130d" }}
+                  activeDot={{ r: 4, strokeWidth: 2, stroke: "#ffffff" }}
                 />
               ))}
             </LineChart>
@@ -137,41 +128,41 @@ export default function MonthlyMonitor({ data }) {
         </div>
       </Panel>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <Panel>
-          <PanelHead title="By product group" sub="HS-2 product aggregates across publishing partners" />
-          <SeriesTable
-            months={months}
-            rows={groups.map((g) => ({
-              key: g.hs2,
-              name: `${g.hs2} · ${g.label}`,
-              series: g.series,
-              total: g.total,
-            }))}
-          />
-        </Panel>
-
-        <Panel>
-          <PanelHead title="By partner" sub="Reported exports to Lebanon, monthly" />
-          <SeriesTable
-            months={months}
-            rows={partners.map((p) => ({
-              key: p.code,
-              name: p.name,
-              series: p.series,
-              total: p.total,
-            }))}
-          />
-        </Panel>
+      <div className="mb-6 text-[12.5px] text-slate1 leading-relaxed max-w-3xl">
+        The heavyweight absentees — China, Türkiye, the UAE and Russia — have not published
+        for this window. Ranks below describe who is <em className="not-italic text-ink2">
+        reporting</em>, not who is shipping most.
       </div>
 
-      <div className="mt-6 text-[12px] text-slate1 leading-relaxed max-w-3xl">
-        <Eyebrow className="mb-1">Why this view exists</Eyebrow>
-        Lebanon&apos;s own annual submissions lag by a year or more. Partner-side monthly
-        filings are the only current view of what is physically flowing toward Lebanese
-        ports — which is why the heavyweight absentees (China, Türkiye, the UAE, Russia)
-        must be kept in mind when reading ranks.
-      </div>
+      <Disclosure summary="Monthly figures by product group and partner">
+        <div className="grid lg:grid-cols-2 gap-6">
+          <Panel>
+            <PanelHead title="By product group" sub="HS-2 aggregates across publishing partners" />
+            <SeriesTable
+              months={months}
+              rows={groups.map((g) => ({
+                key: g.hs2,
+                name: `${g.hs2} · ${g.label}`,
+                series: g.series,
+                total: g.total,
+              }))}
+            />
+          </Panel>
+
+          <Panel>
+            <PanelHead title="By partner" sub="Reported exports to Lebanon, monthly" />
+            <SeriesTable
+              months={months}
+              rows={partners.map((p) => ({
+                key: p.code,
+                name: p.name,
+                series: p.series,
+                total: p.total,
+              }))}
+            />
+          </Panel>
+        </div>
+      </Disclosure>
     </div>
   );
 }

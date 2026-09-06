@@ -85,3 +85,63 @@ export function Note({ message }) {
     </div>
   );
 }
+
+/* ── Triage primitives ────────────────────────────────────────────────────────
+   The queue leads with one number that matters and keeps everything else
+   subordinate to it, so the screen reads as a decision rather than a report. */
+
+/** The single figure the screen is about. Everything else sits under it. */
+export function KeyFigure({ label, value, sub, accent = "gold" }) {
+  const tone = { gold: "text-gold", ink: "text-ink", burgundy: "text-burgundy" }[accent];
+  return (
+    <div>
+      <Eyebrow>{label}</Eyebrow>
+      <div className={`display text-[46px] md:text-[58px] leading-none tracking-tightest mt-1.5 ${tone}`}>
+        {value}
+      </div>
+      {sub && <div className="text-[12.5px] text-slate1 mt-2 max-w-sm leading-relaxed">{sub}</div>}
+    </div>
+  );
+}
+
+/** Supporting figures — inline and quiet, never competing with the KeyFigure. */
+export function Metric({ label, value, tone = "ink" }) {
+  const c = { ink: "text-ink", gold: "text-gold", burgundy: "text-burgundy", cedar: "text-cedar" }[tone];
+  return (
+    <div>
+      <div className="eyebrow text-[10px]">{label}</div>
+      <div className={`num text-[17px] mt-1 ${c}`}>{value}</div>
+    </div>
+  );
+}
+
+/** Proportion bar. Width carries the value; colour only carries category. */
+export function Bar({ value, tone = "gold", className = "" }) {
+  const c = {
+    gold: "bg-gold",
+    burgundy: "bg-burgundy",
+    cedar: "bg-cedar",
+    slate: "bg-slate2",
+  }[tone];
+  return (
+    <div className={`h-[3px] bg-rule w-full ${className}`}>
+      <div
+        className={`h-full ${c}`}
+        style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }}
+      />
+    </div>
+  );
+}
+
+/** Collapsed by default — detail on demand keeps the queue scannable. */
+export function Disclosure({ summary, children, className = "" }) {
+  return (
+    <details className={`group ${className}`}>
+      <summary className="cursor-pointer list-none text-[11px] uppercase tracking-wider num text-slate2 hover:text-gold transition-colors select-none">
+        <span className="inline-block transition-transform group-open:rotate-90 mr-1.5">›</span>
+        {summary}
+      </summary>
+      <div className="mt-3">{children}</div>
+    </details>
+  );
+}

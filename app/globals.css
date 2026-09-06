@@ -3,18 +3,18 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background: #16130d;
-  color: #f3eee2;
+  background: #ffffff;
+  color: #16130d;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-feature-settings: "ss01", "ss02", "tnum";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  /* faint paper grain */
-  background-image: radial-gradient(rgba(243, 238, 226, 0.03) 1px, transparent 1px);
+  /* faint paper grain — dark dots on the light ground */
+  background-image: radial-gradient(rgba(22, 19, 13, 0.045) 1px, transparent 1px);
   background-size: 18px 18px;
   background-position: 0 0;
 }
@@ -32,7 +32,7 @@ body {
     font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #a59e8c;
+    color: #7c7563;
   }
 
   .num {
@@ -53,19 +53,19 @@ body {
     font-size: 10.5px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #a59e8c;
+    color: #7c7563;
     padding: 10px 12px;
-    border-bottom: 1px solid #39342a;
+    border-bottom: 1px solid #ded9ca;
     font-weight: 500;
   }
   .dt td {
     padding: 11px 12px;
-    border-bottom: 1px solid rgba(57, 52, 42, 0.6);
+    border-bottom: 1px solid rgba(222, 217, 202, 0.75);
     vertical-align: top;
     font-size: 14px;
   }
   .dt tr:hover td {
-    background: rgba(243, 238, 226, 0.04);
+    background: rgba(22, 19, 13, 0.035);
   }
 }
 
@@ -89,7 +89,7 @@ body {
   width: 8px;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: #39342a;
+  background: #cfc9b6;
 }
 .thin-scroll::-webkit-scrollbar-track {
   background: transparent;
