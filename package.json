@@ -1,0 +1,24 @@
+{
+  "name": "jamarik",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jamarik — Lebanon customs trade-mirror forensics portal",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
+    "next": "^15.5.25",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "recharts": "^2.15.4"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17"
+  }
+}
