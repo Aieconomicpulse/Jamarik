@@ -11,3 +11,7 @@ npm-debug.log*
 
 # Comtrade bulk downloads — large, re-fetchable
 pipeline/cache/
+
+# Raw Comtrade downloads — 1 GB+, re-fetchable; the pipeline reads them in place
+collected data/
+__pycache__/

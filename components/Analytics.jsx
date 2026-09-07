@@ -25,8 +25,14 @@ const BANDS = [
 
 const SIG_TONE = { under_invoicing: "burgundy", value_gap: "gold", over_invoicing: "neutral", normal: "cedar" };
 
-export default function Analytics({ data, onOpenMirror, onOpenLedger }) {
+export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
   const { meta, corridors = [] } = data;
+  // Partner names back to codes, so a click can open the product view.
+  const partnerCode = useMemo(() => {
+    const m = {};
+    corridors.forEach((c) => { m[c.partnerName] = c.partner; });
+    return m;
+  }, [corridors]);
   const [measure, setMeasure] = useState("fiscal"); // fiscal | count
   const s = useMemo(() => summary(corridors), [corridors]);
   const t = useMemo(() => triage(corridors), [corridors]);
@@ -114,31 +120,37 @@ export default function Analytics({ data, onOpenMirror, onOpenLedger }) {
           <ul className="px-5 py-4 space-y-3.5">
             {chapters.map((r) => (
               <li key={r.key}>
-                <div className="flex items-baseline justify-between gap-3 mb-1">
-                  <span className="text-[13px] text-ink2">{r.label} <span className="text-slate2 num text-[11px] ml-1">{r.key}</span></span>
-                  <span className="num text-[13px] text-ink">{money(r.fiscal)}</span>
-                </div>
-                <Bar value={r.fiscal / maxCh} tone="burgundy" />
+                <button onClick={() => onOpenProducts?.({ partner: "all", chapter: r.key })}
+                  className="w-full text-left group" title="Open every product in this chapter">
+                  <div className="flex items-baseline justify-between gap-3 mb-1">
+                    <span className="text-[13px] text-ink2 group-hover:text-gold transition-colors">{r.label} <span className="text-slate2 num text-[11px] ml-1">{r.key}</span></span>
+                    <span className="num text-[13px] text-ink">{money(r.fiscal)}</span>
+                  </div>
+                  <Bar value={r.fiscal / maxCh} tone="burgundy" />
+                </button>
               </li>
             ))}
           </ul>
         </Panel>
         <Panel>
-          <PanelHead title="By partner" sub="Origin as declared · revenue not collected"
-            right={onOpenMirror && (
-              <button onClick={onOpenMirror} className="text-[11px] uppercase tracking-wider num text-gold hover:text-gold2">
-                Product detail →
+          <PanelHead title="By partner" sub="Origin as declared · revenue not collected · click for products"
+            right={onOpenProducts && (
+              <button onClick={() => onOpenProducts({ partner: "all" })} className="text-[11px] uppercase tracking-wider num text-gold hover:text-gold2">
+                All products →
               </button>
             )} />
           <ul className="px-5 py-4 space-y-3.5">
             {partners.map((r) => (
               <li key={r.key}>
-                <div className="flex items-baseline justify-between gap-3 mb-1">
-                  <span className="text-[13px] text-ink2">{r.key} <span className="text-slate2 num text-[11px] ml-1">{r.count} headings</span></span>
-                  <span className="num text-[13px] text-ink">{money(r.fiscal)}</span>
-                </div>
-                <Bar value={r.fiscal / maxP} tone="burgundy" />
-                <div className="text-[11px] text-slate2 num mt-1">{money(r.trade)} trade · {pct(100 * r.fiscal / Math.max(r.trade, 1), 1)} of it</div>
+                <button onClick={() => onOpenProducts?.({ partner: partnerCode[r.key] })}
+                  className="w-full text-left group" title={`Open ${r.key} product by product`}>
+                  <div className="flex items-baseline justify-between gap-3 mb-1">
+                    <span className="text-[13px] text-ink2 group-hover:text-gold transition-colors">{r.key} <span className="text-slate2 num text-[11px] ml-1">{r.count} headings</span></span>
+                    <span className="num text-[13px] text-ink">{money(r.fiscal)}</span>
+                  </div>
+                  <Bar value={r.fiscal / maxP} tone="burgundy" />
+                  <div className="text-[11px] text-slate2 num mt-1">{money(r.trade)} trade · {pct(100 * r.fiscal / Math.max(r.trade, 1), 1)} of it</div>
+                </button>
               </li>
             ))}
           </ul>
@@ -147,7 +159,7 @@ export default function Analytics({ data, onOpenMirror, onOpenLedger }) {
 
       {/* What to open first */}
       <Panel>
-        <PanelHead title="Open these first" sub="Ranked by revenue at stake × strength of signal"
+        <PanelHead title="Open these first" sub="Ranked by revenue at stake × strength of signal · click a row for its products"
           right={onOpenLedger && (
             <button onClick={onOpenLedger} className="text-[11px] uppercase tracking-wider num text-slate1 hover:text-ink">
               Full ledger →
@@ -166,7 +178,9 @@ export default function Analytics({ data, onOpenMirror, onOpenLedger }) {
             </thead>
             <tbody>
               {top.map((c) => (
-                <tr key={`${c.partner}-${c.hs4}`}>
+                <tr key={`${c.partner}-${c.hs4}`} className="cursor-pointer"
+                  onClick={() => onOpenProducts?.({ partner: c.partner, chapter: c.hs2, hs4: c.hs4 })}
+                  title="Open this heading product by product">
                   <td className="num text-slate2">{String(c.rank).padStart(2, "0")}</td>
                   <td className="whitespace-nowrap">{c.partnerName}</td>
                   <td className="num text-[12px]">{c.label}</td>

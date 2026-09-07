@@ -104,13 +104,21 @@ export function KeyFigure({ label, value, sub, accent = "gold" }) {
   );
 }
 
-/** Supporting figures — inline and quiet, never competing with the KeyFigure. */
-export function Metric({ label, value, tone = "ink" }) {
+/**
+ * Supporting figures — inline and quiet, never competing with the KeyFigure.
+ *
+ * The label box is a fixed two lines tall with the text sat at its bottom, so
+ * a label that wraps ("United States says shipped") and one that does not
+ * ("Gap") still put their values on the same line across the row.
+ */
+export function Metric({ label, value, sub, tone = "ink", size = "md" }) {
   const c = { ink: "text-ink", gold: "text-gold", burgundy: "text-burgundy", cedar: "text-cedar" }[tone];
+  const v = size === "lg" ? "text-[26px] md:text-[30px] leading-none" : "text-[17px]";
   return (
-    <div>
-      <div className="eyebrow text-[10px]">{label}</div>
-      <div className={`num text-[17px] mt-1 ${c}`}>{value}</div>
+    <div className="flex flex-col">
+      <div className="eyebrow text-[10px] leading-[14px] min-h-[28px] flex items-end">{label}</div>
+      <div className={`num mt-1.5 ${v} ${c}`}>{value}</div>
+      {sub && <div className="text-[11px] text-slate2 num mt-1">{sub}</div>}
     </div>
   );
 }

@@ -21,7 +21,7 @@ const PAGE_STEP = 40;
  * behind the triage queue. Headline figures and methodology live in Triage; this
  * view stays deliberately plain so every row can be read and exported.
  */
-export default function GapForensics({ data }) {
+export default function GapForensics({ data, onOpenProducts }) {
   const { meta, sig_counts: sig, corridors = [] } = data;
 
   const [signature, setSignature] = useState("flagged");
@@ -80,7 +80,7 @@ export default function GapForensics({ data }) {
           options={[["all", "All chapters"], ...chapters.map(([k, v]) => [k, `${k} · ${v}`])]}
         />
         <div className="text-[11.5px] text-slate2 num ml-auto">
-          {rows.length} corridors · {money(subtotal)} VAT floor · ranked by absolute gap
+          {rows.length} corridors · {money(subtotal)} VAT floor · ranked by absolute gap · click a row for its products
         </div>
       </div>
 
@@ -102,7 +102,9 @@ export default function GapForensics({ data }) {
             </thead>
             <tbody>
               {shown.map((c) => (
-                <tr key={`${c.partner}-${c.hs4}`}>
+                <tr key={`${c.partner}-${c.hs4}`} className={onOpenProducts ? "cursor-pointer" : ""}
+                  onClick={() => onOpenProducts?.({ partner: c.partner, chapter: c.hs2, hs4: c.hs4 })}
+                  title="Open this heading product by product">
                   <td className="whitespace-nowrap">{c.partnerName}</td>
                   <td>
                     <div className="num text-[12px] text-slate1">{c.label}</div>

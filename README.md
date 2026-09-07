@@ -5,14 +5,13 @@ portal built around one question: what do Lebanon's trading partners say they
 shipped here, and what does Lebanon say it received? Where those two records
 split, customs and VAT revenue quietly leaks.
 
-Three views, all behind a single login:
+Five views, all behind a single login:
 
 | Tab | What it does |
 |---|---|
-| **Overview** | One screen: revenue not collected, split into under-declared / unrecorded / money leaving, the year-on-year trend, top products and partners, and the headings that gap in both years. |
-| **Analytics** | The shape of the problem — how much of what partners shipped Lebanon recorded, by band — then losses by product and partner, and the ten corridors to open first. |
-| **Partner mirror** | Pick a partner and a year: every HS-6 code, the partner's export declaration beside Lebanon's import declaration, gap, cover, reading and VAT forgone. Served by `/api/mirror`. |
-| **Ledger** | Every HS-4 corridor, filterable. The audit surface. |
+| **Products** | The plain reading. Pick a partner and a year: product by product — at chapter, HS-4 or HS-6 — what the partner says it exported, what Lebanon registered, the difference, and the VAT not collected on it. Sortable columns; click a row for the working. Served by `/api/mirror`. |
+| **Analytics** | The shape of the problem — how much of what partners shipped Lebanon recorded, by band — then losses by product and partner, and the ten corridors to open first. Every bar and row opens the Products view on that partner or heading. |
+| **Ledger** | Every HS-4 corridor, filterable. The audit surface. Rows open Products. |
 | **Detective** | Claude, grounded strictly in the loaded data. |
 | **Method** | Everything the figures rest on, and what changes when this is wired to live data. |
 
@@ -81,53 +80,54 @@ To rotate the password, change `PORTAL_PASSWORD` in Vercel. Changing
 
 ## The data
 
-Two JSON files in `/data`, built by `pipeline/build_mirror.py` from Comtrade bulk files. `mirror_gaps.json` is the HS-4 corridor set for every year; `mirror_hs6.json` is the HS-6 partner mirror served through `/api/mirror`. Regenerate both with:
+Two JSON files in `/data`, built by `pipeline/build_mirror.py` from UN Comtrade
+bulk files. `mirror_gaps.json` is the HS-4 corridor set for every year;
+`mirror_hs6.json` is the HS-6 partner mirror served through `/api/mirror`.
+One command writes both, reading each bulk file once:
 
 ```bash
-python pipeline/build_mirror.py --dir <folder of Comtrade CSVs> --out data/mirror_gaps.json
-python pipeline/build_mirror.py --hs6 <folder of Comtrade CSVs> data/mirror_hs6.json
+python pipeline/build_mirror.py --dir "collected data" \
+    --out data/mirror_gaps.json --hs6-out data/mirror_hs6.json
 ```
 
-**`mirror_gaps.json`**
+`collected data/` is the folder of raw downloads and is gitignored (1 GB+).
+Files may be `.csv`, `.gz` or `.zip`, named either the Comtrade way
+(`C_A_H6_842_2024.gz`) or by hand (`USA_842_H6_2023.csv`). Repeat downloads
+with ` 2` or ` (1)` in the name are collapsed to one file per reporter-year.
+Every year needs a Lebanon file (reporter 422); each partner file present for
+that year becomes a mirrored partner.
+
+**`mirror_gaps.json`** — `meta` (years, comparable partners, CIF factor, VAT
+rate, bands, caveats), `years[<year>]` (per-year totals, partner list, and a
+like-for-like `comparable` block), and `corridors[]`:
 
 ```jsonc
 {
-  "meta": {
-    "demo": true,          // drives the amber "Demonstration mode" banner
-    "year": 2024,
-    "cif_factor": 1.08,    // FOB → CIF scaling applied to partner exports
-    "vat_rate": 0.11,
-    "reporters": [{ "code": 300, "name": "Greece", "has_data": true }],
-    "signatures": { "under_invoicing": "Under-invoicing" },
-    "duty_note": "…"
-  },
-  "totals":     { "x_cif": 0, "m": 0, "gap_pos": 0, "vat_floor": 0, "duty_loss": 0 },
-  "sig_counts": { "under_invoicing": 61, "smuggling_risk": 4 },
-  "corridors": [{
-    "partner": 300, "partnerName": "Greece", "hs4": "2710", "hs2": "27",
-    "chapter": "Mineral fuels", "label": "HS 2710",
-    "x_fob": 0, "x_cif": 0, "m": 0,
-    "gap": 0, "gap_pct": 37.5, "qty_gap_pct": 37.5,
-    "signature": "smuggling_risk",
-    "vat_floor": 0, "duty_loss_indicative": 0
-  }]
+  "year": 2024, "partner": 156, "partnerName": "China",
+  "hs4": "9405", "hs2": "94", "chapter": "Furniture & lighting",
+  "x_fob": 0, "x_cif": 0, "m": 0, "gap": 0, "gap_pct": 0, "cover": 0.53,
+  "signature": "under_invoicing",          // value_gap | over_invoicing | normal
+  "shortfall": 0, "outflow": 0,
+  "vat_floor": 0, "duty_rate": 0.1, "duty_loss": 0, "fiscal_loss": 0,
+  "years_seen": 2, "years_flagged": 2, "persistent": true
 }
 ```
 
-**`mirror_monitor.json`** — `meta.months[]`, plus `partners[]` and `groups[]`,
-each carrying a `series[]` aligned to those months and a `total`.
+**`mirror_hs6.json`** — `meta` and `rows[]`, one per partner × year × product
+code, compact keys: `y p hs6 lvl hs4 hs2 ch st x xc m g cv rd vat duty kg lv pv`.
+`st` is how the line was paired (`matched`, `matched_hs5`, `matched_hs4`,
+`partner_only`, `lebanon_only`); `rd` is the reading; `lv`/`pv` are the HS
+editions each side reported in.
 
-### Going live with real data
+### Going live
 
-The partner side of the shipped dataset is **synthetic** — generated with
-injected fraud signatures so every detection pattern is visible. That is why the
-amber banner appears and why nothing here should be cited.
-
-To switch to real reporter data: replace the partner-side figures in
-`data/mirror_gaps.json` from your licensed trade-data source, recompute
-`totals` / `sig_counts` / `corridors`, and set `meta.demo` to `false`. The banner
-disappears on its own, and the Detective stops issuing its synthetic-data
-caveat.
+Every screen reads through `lib/data.js` (`loadGaps`, `loadHs6`) and the API
+route `app/api/mirror/route.js`. Today they return the two JSON files. To go
+live, point `lib/data.js` at a database fed by ASYCUDA / NAJM extracts on the
+Lebanese side and national partner releases on the other; the routes send
+`Cache-Control: no-store` and the Products screen re-fetches on demand, so
+nothing else changes. The stamp beside the tabs switches from *Snapshot* to
+*Live* when `dataStamp()` says so.
 
 ---
 
@@ -140,35 +140,27 @@ app/
   globals.css              palette, editorial type, data-table styles
   login/page.js            the sign-in screen
   api/auth/login|logout/   session mint / clear
+  api/mirror/route.js      HS-6 mirror, one partner-year (or all) per request
   api/detective/route.js   streaming Claude endpoint, grounded in the dataset
 components/
-  CustomsGap.jsx           hero + tab shell
-  GapForensics.jsx         KPI band, corridor table, filters, methodology
-  MonthlyMonitor.jsx       KPI band, line chart, per-group & per-partner tables
+  CustomsGap.jsx           hero, year switch, tab shell, cross-screen focus
+  Products.jsx             partner × year × product: exported / registered / difference / VAT
+  Analytics.jsx            cover-band chart, losses by product and partner, open-first list
+  GapForensics.jsx         the HS-4 ledger
   TradeDetective.jsx       chat transcript, starters, streaming reader
-  ui.jsx                   Stat / Panel / Chip / Select primitives
-  DemoBanner.jsx  TopBar.jsx  Footer.jsx  Wordmark.jsx
+  Method.jsx               what the figures rest on, and going live
+  ui.jsx                   Metric / Panel / Chip / Select primitives
+  TopBar.jsx  Footer.jsx  Wordmark.jsx
 lib/
+  data.js                  the data seam — swap this to go live
+  losses.js                loss taxonomy, cover bands, summaries
+  triage.js                signal strength and ranking
   auth.js                  credentials, HMAC session sign/verify
   format.js                money / percent / count formatters
-data/                      mirror_gaps.json, mirror_monitor.json
+data/                      mirror_gaps.json, mirror_hs6.json
+pipeline/build_mirror.py   Comtrade bulk files -> both JSON files
 middleware.js              the gate
 ```
 
 Restyling normally means editing `tailwind.config.js` (palette),
 `app/globals.css` (type and tables) and `components/ui.jsx` (primitives).
-
----
-
-## Reading the numbers honestly
-
-Partner exports (FOB) are scaled by the `cif_factor` before comparison with
-Lebanon's CIF imports. Residual gaps of ±10–15% are ordinary asymmetry — transit
-timing, valuation, and hub attribution (goods routed via the UAE or Türkiye are
-credited differently by each side). Corridors below $250K are suppressed as
-noise.
-
-Per the WCO, **mirror gaps identify where to investigate — they are not
-findings of wrongdoing.** Declaration-level customs data is where specific
-transactions and importers get identified, inside official channels. The revenue
-figure is a VAT-only floor, not a duty-inclusive loss estimate.

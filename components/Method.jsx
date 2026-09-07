@@ -2,7 +2,7 @@ import { LOSS_TYPES } from "@/lib/losses";
 import { Panel, PanelHead } from "@/components/ui";
 
 /** Everything that was crowding the first screen, in one place, for whoever asks "how". */
-export default function Method({ meta }) {
+export default function Method({ meta, stamp }) {
   return (
     <div className="fade-in max-w-4xl">
       <Panel className="mb-6">
@@ -64,10 +64,24 @@ export default function Method({ meta }) {
       </Panel>
 
       <Panel>
-        <PanelHead title="From demo to live" sub="What changes when this is wired to real data" />
-        <div className="px-5 py-4 text-[13px] text-ink2 leading-relaxed space-y-2">
-          <p>Today every screen reads from files built out of Comtrade bulk downloads. The API route at <code className="num">/api/mirror</code> is the seam: the same request shape can be served from ASYCUDA extracts, partner ACI feeds, and monthly Comtrade releases without changing a screen.</p>
-          <p>Two additions unlock the rest. Declaration-level net weights from NAJM separate under-pricing from missing goods — the one thing public data cannot do. Importer identifiers turn a product heading into a list of names to audit.</p>
+        <PanelHead title="Going live" sub={stamp?.live ? "This portal is reading live data" : `This portal is reading a snapshot built ${stamp?.generated ?? meta.generated}`} />
+        <div className="px-5 py-4 text-[13px] text-ink2 leading-relaxed space-y-3">
+          <p>
+            Every screen reads through one file, <code className="num">lib/data.js</code>, and one API
+            route, <code className="num">/api/mirror</code>. Today they return files the pipeline built from
+            Comtrade bulk downloads. Going live means pointing those two at a database that is fed
+            continuously, and nothing on screen changes except the stamp in the corner.
+          </p>
+          <dl className="grid md:grid-cols-[130px_1fr] gap-x-2 gap-y-2 text-[12.5px]">
+            <dt className="eyebrow text-[10px] pt-0.5">Lebanon side</dt>
+            <dd>Daily ASYCUDA / NAJM extracts of cleared declarations, by partner and HS-8. This is the side that can be current to yesterday.</dd>
+            <dt className="eyebrow text-[10px] pt-0.5">Partner side</dt>
+            <dd>Monthly national releases (China Customs, Eurostat COMEXT, US Census, GCC-Stat) arrive four to eight weeks after month-end; Comtrade annual files a year later. The mirror is always as current as the slower side.</dd>
+            <dt className="eyebrow text-[10px] pt-0.5">Refresh</dt>
+            <dd>The Products screen re-asks the API on demand and never caches. With a live source behind it, the Refresh button is the real-time view.</dd>
+            <dt className="eyebrow text-[10px] pt-0.5">Unlocks</dt>
+            <dd>Declaration-level net weights separate under-pricing from missing goods — the one thing public data cannot do. Importer identifiers turn a product heading into a list of names to audit.</dd>
+          </dl>
         </div>
       </Panel>
     </div>

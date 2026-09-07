@@ -18,7 +18,12 @@ falls apart under the first challenge.
   normal           everything else   ordinary asymmetry           -> not flagged
 
 Usage:
-  python build_v2.py --out data/mirror_gaps.json --dir all/
+  python pipeline/build_mirror.py --dir "collected data" \
+      --out data/mirror_gaps.json --hs6-out data/mirror_hs6.json
+
+Input files may be plain .csv, .gz or .zip, named either the Comtrade way
+(C_A_H6_842_2024.gz) or by hand (USA_842_H6_2023.csv); duplicate downloads of
+the same reporter-year are collapsed.
 """
 
 from __future__ import annotations
@@ -112,6 +117,8 @@ def read_bulk(path: Path) -> pd.DataFrame:
     mode of transport. This filter yields exactly one row per reporter x flow x
     partner x HS-6 and reconciles to the file's own TOTAL row to the dollar.
     """
+    # pandas infers gzip/zip from the extension, so a raw bulk download reads
+    # the same as one that was unpacked by hand.
     df = pd.read_csv(path, sep="\t", dtype={"cmdCode": str}, low_memory=False)
     keep = (
         (df["cmdCode"].str.len() == 6)
@@ -121,6 +128,39 @@ def read_bulk(path: Path) -> pd.DataFrame:
         & (df["customsCode"] == "C00")
     )
     return df.loc[keep].copy()
+
+
+# Two naming schemes turn up in a download folder: Comtrade's own
+# (C_A_<class>_<reporter>_<year>.gz) and the hand-renamed form
+# (<Name>_<reporter>_<class>_<year>.csv). Browsers add " 2" or " (1)" to
+# repeat downloads, so the match is anchored at the front only.
+_COMTRADE = re.compile(r"^C_A_(H\d)_(\d{3})_(\d{4})")
+_NAMED = re.compile(r"^[A-Za-z]+_(\d{3})_(H\d)_(\d{4})")
+_PREFER = {".csv": 0, ".gz": 1, ".zip": 2}   # uncompressed reads fastest
+
+
+def discover(dir_: Path) -> dict[int, dict[int, Path]]:
+    """year -> reporter -> file, one file per reporter-year."""
+    found: dict[tuple[int, int], Path] = {}
+    for p in sorted(dir_.iterdir()):
+        ext = p.suffix.lower()
+        if ext not in _PREFER:
+            continue
+        m = _COMTRADE.match(p.name)
+        if m:
+            _, code, year = m.groups()
+        else:
+            m = _NAMED.match(p.name)
+            if not m:
+                continue
+            code, _, year = m.groups()
+        key = (int(year), int(code))
+        if key not in found or _PREFER[ext] < _PREFER[found[key].suffix.lower()]:
+            found[key] = p
+    files: dict[int, dict[int, Path]] = defaultdict(dict)
+    for (year, code), p in found.items():
+        files[year][code] = p
+    return files
 
 
 def classify(cover: float) -> str:
@@ -223,34 +263,41 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", type=Path, default=Path("all"))
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--hs6-out", type=Path, default=None,
+                    help="also write the HS-6 partner mirror, reading each file once")
     args = ap.parse_args()
 
-    # Discover reporter-year files by name: <Name>_<code>_<class>_<year>.csv
-    files: dict[int, dict[int, Path]] = defaultdict(dict)
-    for p in sorted(args.dir.glob("*.csv")):
-        m = re.match(r".+_(\d+)_(H\d)_(\d{4})\.csv$", p.name)
-        if m:
-            files[int(m.group(3))][int(m.group(1))] = p
-
+    files = discover(args.dir)
     years = sorted(y for y, f in files.items() if LEBANON in f)
     print(f"Years with a Lebanon file: {years}")
+    for y in years:
+        print(f"  {y}: " + ", ".join(f"{COUNTRY.get(c, c)} <- {p.name}" for c, p in sorted(files[y].items())))
 
     corridors: list[dict] = []
     per_year: dict[str, dict] = {}
     partners_by_year: dict[int, list[int]] = {}
+    hs6: list[dict] = []
 
     for year in years:
         leb = read_bulk(files[year][LEBANON])
         rows_this_year: list[dict] = []
         got = []
-        for code, path in files[year].items():
+        for code, path in sorted(files[year].items()):
             if code == LEBANON:
                 continue
-            rows = corridors_for(leb, read_bulk(path), code, year)
+            ptr = read_bulk(path)
+            rows = corridors_for(leb, ptr, code, year)
             if rows:
                 rows_this_year.extend(rows)
                 got.append(code)
                 print(f"  {year} {COUNTRY.get(code, code):<15} {len(rows):>4} corridors")
+            if args.hs6_out:
+                r = hs6_rows(leb, ptr, code, year)
+                hs6.extend(r)
+                n = lambda st: sum(1 for x in r if x["st"] == st)  # noqa: E731
+                print(f"       HS-6 mirror {len(r):>5} lines | "
+                      f"HS-6 {n('matched'):>4} · HS-5 {n('matched_hs5'):>3} · HS-4 {n('matched_hs4'):>3} | "
+                      f"one-sided: partner {n('partner_only'):>4}, Lebanon {n('lebanon_only'):>4}")
         partners_by_year[year] = got
         corridors.extend(rows_this_year)
         per_year[str(year)] = summarise(rows_this_year)
@@ -357,9 +404,9 @@ def main() -> None:
               f"outflow ${v['over']['outflow']/1e6:>7,.1f}M")
     print(f"  persistent flagged headings: {sum(1 for c in corridors if c['persistent'])//2}")
 
+    if args.hs6_out:
+        write_hs6(hs6, args.hs6_out)
 
-if __name__ == "__main__" and "--hs6" not in __import__("sys").argv:
-    main()
 
 
 # --------------------------------------------------------------------------- #
@@ -444,24 +491,7 @@ def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int)
     return out
 
 
-def build_hs6(dir_: Path, out: Path) -> None:
-    files: dict[int, dict[int, Path]] = defaultdict(dict)
-    for p in sorted(dir_.glob("*.csv")):
-        m = re.match(r".+_(\d+)_(H\d)_(\d{4})\.csv$", p.name)
-        if m:
-            files[int(m.group(3))][int(m.group(1))] = p
-    rows: list[dict] = []
-    for year in sorted(y for y, f in files.items() if LEBANON in f):
-        leb = read_bulk(files[year][LEBANON])
-        for code, path in files[year].items():
-            if code == LEBANON:
-                continue
-            r = hs6_rows(leb, read_bulk(path), code, year)
-            rows.extend(r)
-            n = lambda st: sum(1 for x in r if x["st"] == st)  # noqa: E731
-            print(f"  {year} {COUNTRY.get(code, code):<14} {len(r):>5} lines | "
-                  f"HS-6 {n('matched'):>4} · HS-5 {n('matched_hs5'):>3} · HS-4 {n('matched_hs4'):>3} | "
-                  f"still one-sided: partner {n('partner_only'):>4}, Lebanon {n('lebanon_only'):>4}")
+def write_hs6(rows: list[dict], out: Path) -> None:
     out.write_text(json.dumps({
         "meta": {"cif_factor": CIF_FACTOR, "vat_rate": VAT_RATE, "countries": COUNTRY,
                  "generated": date.today().isoformat()},
@@ -471,7 +501,4 @@ def build_hs6(dir_: Path, out: Path) -> None:
 
 
 if __name__ == "__main__":
-    import sys
-    if "--hs6" in sys.argv:
-        i = sys.argv.index("--hs6")
-        build_hs6(Path(sys.argv[i + 1]), Path(sys.argv[i + 2]))
+    main()

@@ -1,31 +1,32 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Overview from "@/components/Overview";
+import Products from "@/components/Products";
 import Analytics from "@/components/Analytics";
-import PartnerMirror from "@/components/PartnerMirror";
 import GapForensics from "@/components/GapForensics";
 import TradeDetective from "@/components/TradeDetective";
 import Method from "@/components/Method";
 import { money } from "@/lib/format";
 import { summary } from "@/lib/losses";
 
-// Overview leads: what is being lost and of what kind. Triage answers what to
-// open first. The ledger is the audit surface behind both.
+// Products leads: one partner, one year, every product — exported, registered,
+// difference, VAT. Analytics gives the shape; the ledger is the audit surface
+// behind both. Any row on those screens opens the product view for that
+// partner and heading, which is what "focus" carries.
 const TABS = [
-  ["overview", "Overview"],
+  ["products", "Products"],
   ["analytics", "Analytics"],
-  ["mirror", "Partner mirror"],
   ["ledger", "Ledger"],
   ["detective", "Detective"],
   ["method", "Method"],
 ];
 
-export default function CustomsGap({ gaps }) {
+export default function CustomsGap({ gaps, stamp }) {
   const { meta, corridors } = gaps;
   const years = meta.years || [];
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("products");
   const [year, setYear] = useState(String(meta.base_year ?? years[years.length - 1]));
+  const [focus, setFocus] = useState(null);
 
   const scope = useMemo(
     () => (year === "all" ? corridors : corridors.filter((c) => c.year === Number(year))),
@@ -64,10 +65,20 @@ export default function CustomsGap({ gaps }) {
   }, [scope, meta, gaps.years, year, years]);
 
   const s = summary(scope);
+  const productYear = year === "all" ? meta.base_year : Number(year);
+
+  // Open the product view on a partner, chapter or heading another screen pointed at.
+  const openProducts = (f = {}) => {
+    setFocus({ year: productYear, ...f, at: Date.now() });
+    setTab("products");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const partnersThisYear = (year === "all" ? meta.comparable_partners : gaps.years?.[year]?.partners) || [];
 
   return (
     <div className="max-w-[1400px] mx-auto px-6 lg:px-10 py-8">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-x-10 gap-y-4 fade-in">
+      <header className="mb-6 grid lg:grid-cols-[minmax(0,1fr)_360px] gap-x-12 gap-y-4 items-end fade-in">
         <div>
           <div className="eyebrow text-cedar mb-2">
             Trade-mirror forensics · Lebanon · {years.join(" & ")}
@@ -76,8 +87,8 @@ export default function CustomsGap({ gaps }) {
             What customs is not collecting
           </h1>
         </div>
-        <p className="text-[13px] text-slate1 leading-relaxed max-w-sm">
-          What exporting countries say they sent to Lebanon, against what Lebanon recorded.
+        <p className="text-[13px] text-slate1 leading-relaxed lg:text-right">
+          What exporting countries say they sent to Lebanon, against what Lebanon registered.
           The difference is revenue not collected.
         </p>
       </header>
@@ -101,6 +112,9 @@ export default function CustomsGap({ gaps }) {
             </button>
           ))}
         </div>
+        <div className="text-[12px] text-slate1 num">
+          {partnersThisYear.map((p) => p.name).join(" · ")}
+        </div>
         <div className="text-[12px] text-slate1 num ml-auto">
           <span className="text-ink">{money(s.fiscal)}</span> uncollected ·{" "}
           <span className="text-slate2">{money(s.outflow)} outflow</span> ·{" "}
@@ -108,31 +122,37 @@ export default function CustomsGap({ gaps }) {
         </div>
       </div>
 
-      <nav className="flex items-center gap-1 mb-8 border-b border-rule" aria-label="Sections">
-        {TABS.map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            aria-current={tab === key ? "page" : undefined}
-            className={`px-4 py-3 text-[12px] tracking-wide uppercase num border-b-2 -mb-px transition-colors ${
-              tab === key
-                ? "border-gold text-gold"
-                : "border-transparent text-slate1 hover:text-ink"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <nav className="flex items-center justify-between gap-4 mb-8 border-b border-rule" aria-label="Sections">
+        <div className="flex items-center gap-1">
+          {TABS.map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              aria-current={tab === key ? "page" : undefined}
+              className={`px-4 py-3 text-[12px] tracking-wide uppercase num border-b-2 -mb-px transition-colors ${
+                tab === key
+                  ? "border-gold text-gold"
+                  : "border-transparent text-slate1 hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {stamp && (
+          <div className="hidden md:block text-[11px] text-slate2 num pb-3" title={stamp.source}>
+            {stamp.live ? "Live" : `Snapshot ${stamp.generated}`} · {stamp.live ? "updates as declarations land" : "UN Comtrade bulk"}
+          </div>
+        )}
       </nav>
 
-      {tab === "overview" && <Overview data={gaps} year={year} onGo={setTab} />}
+      {tab === "products" && <Products defaultYear={productYear} focus={focus} vatRate={meta.vat_rate} />}
       {tab === "analytics" && (
-        <Analytics data={slice} onOpenMirror={() => setTab("mirror")} onOpenLedger={() => setTab("ledger")} />
+        <Analytics data={slice} onOpenProducts={openProducts} onOpenLedger={() => setTab("ledger")} />
       )}
-      {tab === "mirror" && <PartnerMirror defaultYear={year === "all" ? meta.base_year : year} />}
-      {tab === "ledger" && <GapForensics data={slice} />}
+      {tab === "ledger" && <GapForensics data={slice} onOpenProducts={openProducts} />}
       {tab === "detective" && <TradeDetective data={slice} />}
-      {tab === "method" && <Method meta={meta} />}
+      {tab === "method" && <Method meta={meta} stamp={stamp} />}
     </div>
   );
 }
