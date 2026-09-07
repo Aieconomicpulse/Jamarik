@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Panel, PanelHead, Eyebrow } from "@/components/ui";
 
 const STARTERS = [
-  "Rank the top 5 corridors by revenue at risk.",
-  "Which partners flag most for under-invoicing, and why?",
-  "Summarize the tobacco (HS 24) corridors.",
-  "What is the total VAT revenue at risk — and how solid is that number?",
+  "Which products are losing Lebanon the most customs revenue?",
+  "Which of these gaps look genuinely suspicious, and which have an innocent explanation?",
+  "Brief me on the China corridor as if for the Minister.",
+  "What is the total VAT at risk — and how solid is that number?",
 ];
 
 /**
@@ -26,6 +26,11 @@ function buildContext(data) {
       vat_rate: meta.vat_rate,
       reporters: meta.reporters,
       signatures: meta.signatures,
+      source: meta.source,
+      coverage: meta.coverage,
+      quantity_available: meta.quantity_available,
+      quantity_note: meta.quantity_note,
+      diagnostics: meta.diagnostics,
     },
     totals,
     sig_counts,
@@ -39,8 +44,10 @@ function buildContext(data) {
       gap: c.gap,
       gap_pct: c.gap_pct,
       qty_gap_pct: c.qty_gap_pct,
+      cover: c.cover,
       signature: c.signature,
       vat_floor: c.vat_floor,
+      confidence: c.confidence,
     })),
   };
 }
@@ -137,7 +144,8 @@ export default function TradeDetective({ data }) {
             <div className="text-[13px] text-slate1 leading-relaxed max-w-xl">
               I read Lebanon&apos;s mirror gaps — partner-reported exports against Lebanon&apos;s
               declared imports — and investigate where the numbers don&apos;t reconcile. Ask me
-              anything below, or pick a starting point on the right.
+              which products are losing the most revenue, which corridors are worth an
+              inspection, and which gaps have an innocent explanation.
               {data?.meta?.demo && (
                 <span className="block mt-2 text-gold">
                   Demonstration data: the partner side is synthetic — figures are illustrative

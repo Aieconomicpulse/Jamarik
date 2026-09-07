@@ -1,0 +1,66 @@
+# Jamarik data pipeline — what to download from UN Comtrade.
+#
+# Every value here is a deliberate choice, not a default. Read the comments
+# before changing anything: several of these settings are what keep the mirror
+# comparison honest.
+
+lebanon_code: 422
+
+# Years to pull. A gap that persists across six years is a system; one that
+# appears in a single year is usually a data error. Six years costs no more in
+# API calls than one — the calls are per reporter, and periods batch.
+years: [2019, 2020, 2021, 2022, 2023, 2024]
+
+# Product detail. AG6 = 6-digit HS subheading (the finest comparable level).
+# We aggregate up to HS-4 for headline corridors because the HS revisions of
+# 2017 and 2022 changed ~350 six-digit codes, and HS-4 is stable across them.
+commodity_level: AG6
+
+# Classic breakdown returns one row per partner × product. The "plus" mode
+# breaks the same trade down further by second partner, mode of transport and
+# customs procedure — summing those rows double-counts. Do not change this
+# without also changing the de-duplication in build.py.
+breakdown_mode: classic
+
+# Which partners to mirror. Rather than hardcoding a list, the pipeline asks
+# Lebanon's own data who its suppliers are, then keeps the largest ones that
+# actually report to Comtrade. This is defensible in a meeting: the list came
+# from Lebanese records, not from our assumptions.
+partner_selection:
+  # Keep partners until this share of Lebanon's total import value is covered.
+  coverage_target: 0.97
+  # Never include a partner smaller than this in any single year (USD).
+  min_annual_value: 5_000_000
+  # Hard cap, to stay well inside the 500-calls-per-day free tier.
+  max_partners: 60
+
+# Countries that do not report to Comtrade at all, or stopped. Corridors with
+# these partners rest on Lebanese records alone and must be excluded from the
+# mirror rather than shown as a 100% gap.
+known_non_reporters:
+  643: Russian Federation   # no detailed customs data published since 2022
+  364: Iran
+  760: Syria
+  368: Iraq
+
+# Hub economies. Goods routed through these are credited differently by each
+# side — China records an export to the UAE, Lebanon records an import from
+# China. Their re-export flows are pulled separately so hub routing can be
+# netted out instead of being counted as evasion.
+hubs:
+  784: United Arab Emirates
+  792: Türkiye
+  344: China, Hong Kong SAR
+
+# Trade directions to mirror.
+#   imports  — Lebanon's imports vs partners' exports  → under-invoicing, smuggling
+#   exports  — Lebanon's exports vs partners' imports  → phantom exports, capital flight
+directions: [imports, exports]
+
+# Also pull monthly data for the current and previous year, for the fast
+# publishers only. This drives the early-warning view.
+monthly:
+  enabled: true
+  years: [2025, 2026]
+
+output_dir: pipeline/cache
