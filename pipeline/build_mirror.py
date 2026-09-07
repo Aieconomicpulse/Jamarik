@@ -24,6 +24,12 @@ Usage:
 Input files may be plain .csv, .gz or .zip, named either the Comtrade way
 (C_A_H6_842_2024.gz) or by hand (USA_842_H6_2023.csv); duplicate downloads of
 the same reporter-year are collapsed.
+
+Lebanon reports in HS 2017 and every partner in HS 2022. Before any pairing,
+partner codes are converted to HS 2017 with the official UNSD correlation
+table (pipeline/hs/HS2022toHS2017.xlsx), so the two sides are compared on
+the same code. Nothing is paired by prefix or by guesswork; a code the
+table cannot place stays one-sided and is labelled as such.
 """
 
 from __future__ import annotations
@@ -108,6 +114,70 @@ COUNTRY = {
 
 # --------------------------------------------------------------------------- #
 
+# --------------------------------------------------------------------------- #
+# HS edition concordance                                                       #
+# --------------------------------------------------------------------------- #
+
+HS_TABLE = Path(__file__).resolve().parent / "hs" / "HS2022toHS2017.xlsx"
+
+# Mapping kinds, worst first. A merged HS-2017 line inherits the worst kind of
+# the HS-2022 codes that fed it.
+MAP_RANK = {"unmapped": 0, "split": 1, "merged": 2, "recoded": 3, "same": 4}
+
+
+class Concordance:
+    """
+    HS 2022 -> HS 2017, from the UNSD tables.
+
+    The Conversions sheet gives one HS-2017 target for every HS-2022 code —
+    the same rule Comtrade applies when it republishes data in another
+    edition. The Correlations sheet lists every relationship, which is what
+    tells us whether that single target was the only possibility ("same",
+    "recoded"), one of several codes pooled into it ("merged"), or a code
+    whose value could legitimately sit under more than one HS-2017 code
+    ("split"). Split lines are still converted, but they are marked so a
+    reader knows the pairing rests on a convention.
+    """
+
+    def __init__(self, path: Path = HS_TABLE):
+        conv = pd.read_excel(path, sheet_name="HS2022-HS2017 Conversions",
+                             header=None, skiprows=1, dtype=str).dropna()
+        conv.columns = ["h22", "h17"]
+        corr = pd.read_excel(path, sheet_name="HS2022-HS2017 Correlations",
+                             header=None, skiprows=2, dtype=str).dropna(subset=[0, 1])
+        corr.columns = ["h22", "h17", "rel"]
+        z = lambda col: col.str.zfill(6)  # noqa: E731
+        self.to17 = dict(zip(z(conv.h22), z(conv.h17)))
+        self.targets = z(corr.h22).to_frame("h22").assign(h17=z(corr.h17)).groupby("h22").h17.apply(set).to_dict()
+        self.sources = z(corr.h17).to_frame("h17").assign(h22=z(corr.h22)).groupby("h17").h22.apply(set).to_dict()
+
+    def convert(self, code: str) -> tuple[str, str]:
+        """
+        (HS-2017 code, mapping kind) for one HS-2022 code.
+
+        "split" is the only kind read off the table's relationships: it marks
+        a code whose value could sit under more than one HS-2017 code, so the
+        single target is a convention. "merged" is decided later, from what
+        actually happened in a partner's data — several reported codes landing
+        on one line — not from what the table says could happen.
+        """
+        t = self.to17.get(code)
+        if t is None:
+            return code, "unmapped"
+        if len(self.targets.get(code, {code})) > 1:
+            return t, "split"
+        return t, "recoded" if t != code else "same"
+
+
+def to_hs2017(partner: pd.DataFrame, hs: Concordance) -> pd.DataFrame:
+    """Partner export rows with two extra columns: h17 and map."""
+    out = partner.copy()
+    conv = out.cmdCode.map(lambda c: hs.convert(c))
+    out["h17"] = conv.map(lambda x: x[0])
+    out["map"] = conv.map(lambda x: x[1])
+    return out
+
+
 def read_bulk(path: Path) -> pd.DataFrame:
     """
     One reporter-year, reduced to genuine non-overlapping detail rows.
@@ -174,14 +244,16 @@ def classify(cover: float) -> str:
 
 
 def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
-                  code: int, year: int) -> list[dict]:
+                  code: int, year: int, hs: Concordance) -> list[dict]:
     leb = lebanon[(lebanon.flowCode == "M") & (lebanon.partnerCode == code)].copy()
     ptr = partner[(partner.flowCode == "X") & (partner.partnerCode == LEBANON)].copy()
     if leb.empty or ptr.empty:
         return []
 
+    # Both sides on HS 2017 before the heading is cut.
+    ptr = to_hs2017(ptr, hs)
     leb["hs4"] = leb.cmdCode.str[:4]
-    ptr["hs4"] = ptr.cmdCode.str[:4]
+    ptr["hs4"] = ptr.h17.str[:4]
     a = leb.groupby("hs4").primaryValue.sum().rename("m")
     b = ptr.groupby("hs4").agg(x_fob=("primaryValue", "sum"), x_kg=("netWgt", "sum"))
     frame = pd.concat([a, b], axis=1).fillna(0.0).reset_index()
@@ -267,6 +339,11 @@ def main() -> None:
                     help="also write the HS-6 partner mirror, reading each file once")
     args = ap.parse_args()
 
+    hs = Concordance()
+    print(f"HS 2022 -> HS 2017: {len(hs.to17):,} codes, "
+          f"{sum(1 for c, t in hs.to17.items() if c != t)} recoded, "
+          f"{sum(1 for c in hs.to17 if len(hs.targets.get(c, ())) > 1)} split")
+
     files = discover(args.dir)
     years = sorted(y for y, f in files.items() if LEBANON in f)
     print(f"Years with a Lebanon file: {years}")
@@ -286,18 +363,19 @@ def main() -> None:
             if code == LEBANON:
                 continue
             ptr = read_bulk(path)
-            rows = corridors_for(leb, ptr, code, year)
+            rows = corridors_for(leb, ptr, code, year, hs)
             if rows:
                 rows_this_year.extend(rows)
                 got.append(code)
                 print(f"  {year} {COUNTRY.get(code, code):<15} {len(rows):>4} corridors")
             if args.hs6_out:
-                r = hs6_rows(leb, ptr, code, year)
+                r = hs6_rows(leb, ptr, code, year, hs)
                 hs6.extend(r)
                 n = lambda st: sum(1 for x in r if x["st"] == st)  # noqa: E731
-                print(f"       HS-6 mirror {len(r):>5} lines | "
-                      f"HS-6 {n('matched'):>4} · HS-5 {n('matched_hs5'):>3} · HS-4 {n('matched_hs4'):>3} | "
-                      f"one-sided: partner {n('partner_only'):>4}, Lebanon {n('lebanon_only'):>4}")
+                m = lambda k: sum(1 for x in r if x.get("map") == k)  # noqa: E731
+                print(f"       HS-6 mirror {len(r):>5} lines | paired {n('matched'):>4} | "
+                      f"one-sided: partner {n('partner_only'):>4}, Lebanon {n('lebanon_only'):>4} | "
+                      f"mapping: recoded {m('recoded')}, merged {m('merged')}, split {m('split')}, unmapped {m('unmapped')}")
         partners_by_year[year] = got
         corridors.extend(rows_this_year)
         per_year[str(year)] = summarise(rows_this_year)
@@ -364,6 +442,12 @@ def main() -> None:
                 "normal": "Within normal asymmetry",
                 "smuggling_risk": "Goods not presented",
             },
+            "classification": (
+                "Lebanon reports in HS 2017 (H5); every partner in HS 2022 (H6). Partner codes "
+                "are converted to HS 2017 with the UNSD HS2022-to-HS2017 conversion table before "
+                "pairing. Codes the table cannot place stay one-sided and are labelled unmapped."
+            ),
+            "hs_table": "UNSD HS2022toHS2017ConversionAndCorrelationTables.xlsx",
             "quantity_available": False,
             "quantity_note": (
                 "Lebanon publishes no genuine net weight to Comtrade — every non-zero "
@@ -413,7 +497,7 @@ def main() -> None:
 # HS-6 layer — the partner-by-partner mirror the portal serves through its API  #
 # --------------------------------------------------------------------------- #
 
-def _row(code, level, status, m, x_fob, kg, lc, pc, year, partner):
+def _row(code, status, m, x_fob, kg, lc, pc, year, partner, src, kind):
     x_cif = x_fob * CIF_FACTOR
     gap = x_cif - m
     if m > 0 and x_fob == 0:
@@ -425,7 +509,7 @@ def _row(code, level, status, m, x_fob, kg, lc, pc, year, partner):
         reading = classify(cover)
     hs2 = code[:2]
     return {
-        "y": year, "p": partner, "hs6": code, "lvl": level,
+        "y": year, "p": partner, "hs6": code,
         "hs4": code[:4], "hs2": hs2, "ch": CHAPTERS.get(hs2, ""),
         "st": status,
         "x": round(x_fob, 2), "xc": round(x_cif, 2), "m": round(m, 2),
@@ -434,60 +518,54 @@ def _row(code, level, status, m, x_fob, kg, lc, pc, year, partner):
         "duty": round(gap * duty_rate(hs2), 2) if gap > 0 else 0.0,
         "kg": round(kg, 1) if kg else None,
         "lv": lc, "pv": pc,
+        # What the partner actually reported (HS 2022) and how it was placed.
+        "pc": src, "map": kind,
     }
 
 
-def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int) -> list[dict]:
+def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int,
+             hs: Concordance) -> list[dict]:
     """
-    Every product code on which either side reported the corridor, matched as
-    finely as the two classifications allow.
+    Every product code on which either side reported the corridor, paired on
+    HS 2017.
 
-    Lebanon reports in HS 2017 and its partners in HS 2022, and about 350
-    six-digit codes moved between the two editions. A naive HS-6 join therefore
-    shows hundreds of "one-sided" lines that are really the same goods under a
-    renumbered code. So the match cascades: pair at HS-6 first; whatever is left
-    unpaired on both sides is rolled up and paired at HS-5; whatever is still
-    unpaired is tried at HS-4. Only what survives all three is truly one-sided.
-    Each row carries the level it was matched at.
+    The partner's HS-2022 codes are converted with the official table first,
+    so a code that was renumbered between editions lands on the code Lebanon
+    would have used. Several HS-2022 codes that the table pools into one
+    HS-2017 code are summed; their original codes are kept on the line. What
+    remains one-sided after that is genuinely one-sided — nothing is paired
+    by prefix.
     """
     a = lebanon[(lebanon.flowCode == "M") & (lebanon.partnerCode == code)]
     a = a.groupby("cmdCode").agg(m=("primaryValue", "sum"), lc=("classificationCode", "first"))
     b = partner[(partner.flowCode == "X") & (partner.partnerCode == LEBANON)]
-    b = b.groupby("cmdCode").agg(x_fob=("primaryValue", "sum"), kg=("netWgt", "sum"),
-                                 pc=("classificationCode", "first"))
-    j = a.join(b, how="outer").reset_index()
+    b = to_hs2017(b, hs)
+    b = b.groupby("h17").agg(
+        x_fob=("primaryValue", "sum"), kg=("netWgt", "sum"),
+        pc=("classificationCode", "first"),
+        src=("cmdCode", lambda v: "+".join(sorted(set(v)))),
+        kind=("map", lambda v: min(v, key=lambda k: MAP_RANK[k])),
+        nsrc=("cmdCode", "nunique"),
+    )
+    # Several reported codes on one HS-2017 line: that is a merge, whatever
+    # each code's own kind was.
+    b.loc[b.nsrc > 1, "kind"] = "merged"
+    j = a.join(b, how="outer").reset_index().rename(columns={"index": "cmdCode"})
     j["m"] = j.m.fillna(0.0)
     j["x_fob"] = j.x_fob.fillna(0.0)
     j["kg"] = j.kg.fillna(0.0)
 
     out: list[dict] = []
-    both = j[(j.m > 0) & (j.x_fob > 0)]
-    for r in both.itertuples(index=False):
-        out.append(_row(r.cmdCode, 6, "matched", r.m, r.x_fob, r.kg,
-                        r.lc if isinstance(r.lc, str) else None,
-                        r.pc if isinstance(r.pc, str) else None, year, code))
-
-    # The cascade. `left` holds rows still unpaired after each pass.
-    left = j[~((j.m > 0) & (j.x_fob > 0))].copy()
-    for level in (5, 4):
-        if left.empty:
-            break
-        left["key"] = left.cmdCode.str[:level]
-        leb_side = left[left.m > 0].groupby("key").agg(m=("m", "sum"), lc=("lc", "first"))
-        ptr_side = left[left.x_fob > 0].groupby("key").agg(x_fob=("x_fob", "sum"), kg=("kg", "sum"),
-                                                          pc=("pc", "first"))
-        pairs = leb_side.join(ptr_side, how="inner")
-        for key, r in pairs.iterrows():
-            out.append(_row(key, level, f"matched_hs{level}", r.m, r.x_fob, r.kg,
-                            r.lc if isinstance(r.lc, str) else None,
-                            r.pc if isinstance(r.pc, str) else None, year, code))
-        left = left[~left.key.isin(pairs.index)]
-
-    for r in left.itertuples(index=False):
-        status = "lebanon_only" if r.m > 0 else "partner_only"
-        out.append(_row(r.cmdCode, 6, status, r.m, r.x_fob, r.kg,
-                        r.lc if isinstance(r.lc, str) else None,
-                        r.pc if isinstance(r.pc, str) else None, year, code))
+    for r in j.itertuples(index=False):
+        status = "matched" if (r.m > 0 and r.x_fob > 0) else ("lebanon_only" if r.m > 0 else "partner_only")
+        out.append(_row(
+            r.cmdCode, status, r.m, r.x_fob, r.kg,
+            r.lc if isinstance(r.lc, str) else None,
+            r.pc if isinstance(r.pc, str) else None,
+            year, code,
+            r.src if isinstance(r.src, str) else None,
+            r.kind if isinstance(r.kind, str) else None,
+        ))
     return out
 
 

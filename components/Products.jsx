@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { money } from "@/lib/format";
 import { LOSS_BY_KEY, REVENUE_READINGS, classifyCover } from "@/lib/losses";
-import { Bar, Button, Chip, Input, Panel, Segmented, Select, Skeleton, Tile } from "@/components/ui";
+import { Bar, Button, Chip, Icon, Input, Panel, Segmented, Select, Skeleton, Tile } from "@/components/ui";
 
 // Product by product. What the partner says it exported to Lebanon, what
 // Lebanon registered, the difference, and the VAT that difference cost —
@@ -26,6 +26,15 @@ const BAR_TONE = {
   over_invoicing: "slate", normal: "cedar", not_in_partner: "slate",
 };
 
+// How the partner's HS-2022 code was placed on Lebanon's HS 2017.
+const MAP = {
+  same: null,
+  recoded: { label: "Recoded", title: "Renumbered between HS 2017 and HS 2022 — converted with the official UNSD table" },
+  merged: { label: "Merged", title: "Several HS 2022 codes pool into this HS 2017 code — summed" },
+  split: { label: "Split", title: "This HS 2022 code can sit under more than one HS 2017 code — the UNSD convention was applied" },
+  unmapped: { label: "Unmapped", title: "Not in the UNSD table — compared on the code as reported" },
+};
+
 const LEVELS = [["2", "Chapter"], ["4", "HS-4"], ["6", "HS-6"]];
 const PAGE = 50;
 
@@ -42,13 +51,14 @@ function rollup(rows, level, vatRate) {
     const cur = map.get(key) || {
       key, code: key, hs2: r.hs2, hs4: r.hs4,
       name: r.ch || (r.hs2 === "99" ? "Unclassified — confidential or unallocated" : `Chapter ${r.hs2}`),
-      x: 0, xc: 0, m: 0, duty: 0, lines: 0, lvl: 6,
-      partners: new Set(), editions: new Set(),
+      x: 0, xc: 0, m: 0, duty: 0, lines: 0, mapped: 0,
+      partners: new Set(), editions: new Set(), maps: new Set(), pcs: new Set(),
     };
     cur.x += r.x; cur.xc += r.xc; cur.m += r.m; cur.lines += 1;
     cur.partners.add(r.p);
     if (r.lv || r.pv) cur.editions.add(`${r.lv ?? "·"}/${r.pv ?? "·"}`);
-    if (r.lvl && r.lvl < cur.lvl) cur.lvl = r.lvl;
+    if (r.map && r.map !== "same") { cur.mapped += 1; cur.maps.add(r.map); }
+    if (r.pc && r.pc !== r.hs6) cur.pcs.add(r.pc);
     if (r.g > 0) cur.duty += r.duty;
     map.set(key, cur);
   }
@@ -148,6 +158,21 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
 
   const rolled = useMemo(() => (data ? rollup(data.rows, lvl, rate) : []), [data, lvl, rate]);
 
+  // The chapter view of the same lines. A heading that gaps while its chapter
+  // balances is the two customs services coding the same goods differently —
+  // the tag says so, and the conservative figure nets within chapter first.
+  const byChapter = useMemo(() => {
+    const m = new Map();
+    (data ? rollup(data.rows, 2, rate) : []).forEach((c) => m.set(c.hs2, c));
+    return m;
+  }, [data, rate]);
+  const conservative = useMemo(() => {
+    let short = 0, vat = 0;
+    byChapter.forEach((c) => { if (c.vat > 0) { short += c.g; vat += c.vat; } });
+    return { short, vat };
+  }, [byChapter]);
+  const chapterBalances = (r) => lvl !== 2 && r.g > 0 && REVENUE_READINGS.has(r.rd) && (byChapter.get(r.hs2)?.g ?? 1) <= 0;
+
   const rows = useMemo(() => {
     let r = rolled;
     if (scope === "revenue") r = r.filter((x) => REVENUE_READINGS.has(x.rd) && x.g > 0);
@@ -227,15 +252,30 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             <Tile label={`${many ? "Partners" : name} exported`} value={money(s.x_cif)} sub={`${money(s.x_fob)} FOB, CIF-adjusted ×${avail?.meta?.cif_factor ?? 1.05}`} />
             <Tile label="Lebanon registered" value={money(s.m)} sub={s.cover == null ? "—" : `${Math.round(s.cover * 100)}% of the partner figure`} />
             <Tile label="Difference in total" value={money(s.gap)} tone={s.gap > 0 ? "burgundy" : "ink"} sub={s.gap > 0 ? "Lebanon registered less overall" : "Lebanon registered more overall"} />
-            <Tile label="VAT not collected" value={money(s.vat_lost)} tone="gold" sub={`${Math.round(rate * 100)}% of ${money(s.shortfall)} short on ${s.revenue_lines.toLocaleString()} products`} />
+            <Tile label="VAT not collected" value={money(s.vat_lost)} tone="gold" sub={`${Math.round(rate * 100)}% of ${money(s.shortfall)} short on ${s.revenue_lines.toLocaleString()} products · netted within chapter: ${money(conservative.vat)}`} />
           </div>
+
+          {/* How to read the two figures — the part people trip on. */}
+          <details className="group rounded-lg border border-rule bg-bone/70 mb-6 open:bg-bone open:shadow-card transition-colors">
+            <summary className="flex items-center gap-2.5 px-4 h-11 cursor-pointer list-none text-[13px] text-ink2 hover:text-ink select-none">
+              <Icon name="info" className="w-4 h-4 text-gold" />
+              <span>How to read these figures — why the total and the VAT can point in different directions</span>
+              <Icon name="chevronDown" className="w-4 h-4 ml-auto text-slate2 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="px-4 pb-4 pt-1 text-[12.5px] text-ink2 leading-relaxed grid md:grid-cols-3 gap-x-8 gap-y-3">
+              <p><span className="text-ink">Total difference</span> is a net: products where Lebanon registered less, minus products where it registered more. VAT is charged declaration by declaration, so registering more on one product never refunds the VAT missed on another. <span className="text-ink">VAT not collected</span> counts only the products where Lebanon registered less — {s.revenue_lines.toLocaleString()} of them here, {money(s.shortfall)} short.</p>
+              <p><span className="text-ink">Same goods, different code.</span> Both sides are put on HS 2017 with the official UNSD table before pairing, so edition changes are handled. What the table cannot fix is practice: one customs service files a product under one heading, the other under a neighbour (medicaments 3004 vs immunologicals 3002). When a chapter balances but its headings gap in opposite directions, the line is tagged <Chip tone="neutral">chapter balances</Chip> and should be read as coding, not revenue.</p>
+              <p><span className="text-ink">Two figures, deliberately.</span> Line by line: <span className="num text-gold">{money(s.vat_lost)}</span>. Netted within each chapter first: <span className="num text-gold">{money(conservative.vat)}</span> on {money(conservative.short)} short. The truth sits between them; the first is what a declaration-level audit would test, the second is what survives every classification argument. Switch to the <span className="text-ink">Chapter</span> level to see the netted view directly.</p>
+            </div>
+          </details>
 
           {/* Match quality — the honesty strip */}
           <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-[11.5px] text-slate1 mb-6">
             <span><span className="text-ink num">{s.lines.toLocaleString()}</span> product lines</span>
-            <span><span className="text-ink num">{s.matched.toLocaleString()}</span> paired at HS-6</span>
-            <span><span className="text-ink num">{s.matched_hs5.toLocaleString()}</span> at HS-5</span>
-            <span><span className="text-ink num">{s.matched_hs4.toLocaleString()}</span> at HS-4</span>
+            <span><span className="text-ink num">{s.matched.toLocaleString()}</span> paired on HS 2017</span>
+            <span title="Partner codes renumbered between HS editions, converted with the official UNSD table"><span className="text-ink num">{(s.by_map?.recoded ?? 0) + (s.by_map?.merged ?? 0)}</span> recoded by the HS table</span>
+            <span title="Partner codes that could sit under more than one HS 2017 code"><span className="text-ink num">{s.by_map?.split ?? 0}</span> split</span>
+            {(s.by_map?.unmapped ?? 0) > 0 && <span><span className="text-burgundy num">{s.by_map.unmapped}</span> unmapped</span>}
             <span><span className="text-ink num">{s.partner_only.toLocaleString()}</span> only in {many ? "partner" : `${name}'s`} records</span>
             <span><span className="text-ink num">{s.lebanon_only.toLocaleString()}</span> only in Lebanon&apos;s</span>
           </div>
@@ -275,10 +315,16 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                       <tr key={r.key} onClick={() => setOpen(isOpen ? null : r.key)}
                         className={`cursor-pointer ${isOpen ? "[&>td]:bg-gold/5 [&>td:first-child]:shadow-[inset_3px_0_0_#8a6714]" : ""}`} aria-expanded={isOpen}>
                         <td>
-                          <div className="flex items-baseline gap-2">
+                          <div className="flex items-baseline gap-2 flex-wrap">
                             <span className="num text-[13px] text-ink">{r.code}</span>
-                            {r.lvl < 6 && lvl === 6 && (
-                              <span className="text-[10px] text-slate2 num" title={`Paired at HS-${r.lvl}: the two sides number it differently below this level`}>HS-{r.lvl}</span>
+                            {lvl === 6 && [...r.maps].map((k) => MAP[k] && (
+                              <span key={k} className="text-[10px] uppercase tracking-wider num text-slate2 border border-rule rounded px-1" title={MAP[k].title}>{MAP[k].label}</span>
+                            ))}
+                            {lvl < 6 && r.mapped > 0 && (
+                              <span className="text-[10px] uppercase tracking-wider num text-slate2 border border-rule rounded px-1" title={`${r.mapped} of ${r.lines} lines were recoded between HS editions with the official table`}>{r.mapped} recoded</span>
+                            )}
+                            {chapterBalances(r) && (
+                              <span className="text-[10px] uppercase tracking-wider num text-cedar border border-cedar/40 rounded px-1" title="This chapter balances overall — the gap here is offset by a neighbouring heading. Read as a coding difference, not revenue.">chapter balances</span>
                             )}
                           </div>
                           <div className="text-[13px] text-ink2 leading-snug">{r.name}</div>
@@ -297,7 +343,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                       isOpen && (
                         <tr key={`${r.key}-detail`} className="[&>td]:bg-bone2/50 [&>td]:shadow-[inset_3px_0_0_#8a6714]">
                           <td colSpan={many ? 7 : 6} className="!pt-3 !pb-5">
-                            <Detail r={r} name={name} rate={rate} cif={avail?.meta?.cif_factor ?? 1.05} level={lvl} />
+                            <Detail r={r} name={name} rate={rate} cif={avail?.meta?.cif_factor ?? 1.05} level={lvl} chapter={byChapter.get(r.hs2)} balances={chapterBalances(r)} />
                           </td>
                         </tr>
                       ),
@@ -326,8 +372,10 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             Exported = the partner&apos;s own export declaration, raised ×{avail?.meta?.cif_factor ?? 1.05} to put it on
             Lebanon&apos;s CIF footing. Difference = exported − registered; positive means Lebanon registered less.
             VAT lost = {Math.round(rate * 100)}% of the difference, counted only where the reading is under-declared,
-            largely unrecorded, or not registered at all. Click a row for the working. Chapter and HS-4 figures
-            are the HS-6 lines summed and then read, the same way the ledger reads a corridor.
+            largely unrecorded, or not registered at all. Partner codes (HS 2022) are converted to Lebanon&apos;s
+            HS 2017 with the official UNSD table before pairing; nothing is paired by prefix. Click a row for the
+            working, including the code the partner actually reported. Chapter and HS-4 figures are the HS-6
+            lines summed and then read, the same way the ledger reads a corridor.
           </p>
         </>
       )}
@@ -349,9 +397,11 @@ function Th({ k, sort, onSort, right, children }) {
 }
 
 /** The working behind one row, in the order a challenge would come. */
-function Detail({ r, name, rate, cif, level }) {
+function Detail({ r, name, rate, cif, level, chapter, balances }) {
   const loss = LOSS_BY_KEY[r.rd];
   const editions = [...r.editions];
+  const maps = [...r.maps];
+  const pcs = [...r.pcs];
   return (
     <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-x-10 gap-y-4 text-[12.5px] leading-relaxed">
       <dl className="grid grid-cols-[150px_1fr] gap-y-1.5">
@@ -361,8 +411,18 @@ function Detail({ r, name, rate, cif, level }) {
         <dt className="eyebrow text-[10px] pt-0.5">Cover</dt><dd className="num text-ink">{r.cv == null ? "—" : `${Math.round(r.cv * 100)}%`} <span className="text-slate2">of the partner figure</span></dd>
         <dt className="eyebrow text-[10px] pt-0.5">VAT lost</dt><dd className="num text-gold">{r.vat ? `${money(r.vat)}` : "—"} <span className="text-slate2">= difference × {Math.round(rate * 100)}%</span></dd>
         <dt className="eyebrow text-[10px] pt-0.5">Duty (indicative)</dt><dd className="num text-ink">{r.duty ? money(r.duty) : "—"} <span className="text-slate2">flat band, verify against the tariff</span></dd>
-        {level < 6 && <><dt className="eyebrow text-[10px] pt-0.5">Made of</dt><dd className="num text-ink">{r.lines} HS-6 line{r.lines === 1 ? "" : "s"}</dd></>}
+        {level < 6 && <><dt className="eyebrow text-[10px] pt-0.5">Made of</dt><dd className="num text-ink">{r.lines} HS-6 line{r.lines === 1 ? "" : "s"}{r.mapped > 0 && <span className="text-slate2"> · {r.mapped} recoded between editions</span>}</dd></>}
         {editions.length > 0 && <><dt className="eyebrow text-[10px] pt-0.5">HS editions</dt><dd className="num text-ink">{editions.join(", ")} <span className="text-slate2">Lebanon / partner</span></dd></>}
+        {level === 6 && (
+          <><dt className="eyebrow text-[10px] pt-0.5">{name} reported as</dt>
+          <dd className="num text-ink">{pcs.length ? pcs.join(", ") : r.code}{" "}
+            <span className="text-slate2">{maps.length ? `— ${maps.map((k) => MAP[k]?.title ?? k).join("; ")}` : "— same code in both HS editions"}</span></dd></>
+        )}
+        {chapter && level !== 2 && (
+          <><dt className="eyebrow text-[10px] pt-0.5">Chapter {r.hs2}</dt>
+          <dd className="num text-ink">{money(chapter.xc)} exported · {money(chapter.m)} registered{" "}
+            <span className={balances ? "text-cedar" : "text-slate2"}>{balances ? "— balances: this gap is offset within the chapter, read as a coding difference" : chapter.g > 0 ? "— the chapter as a whole is also short" : ""}</span></dd></>
+        )}
       </dl>
       <div className="text-ink2 space-y-2">
         {loss ? (

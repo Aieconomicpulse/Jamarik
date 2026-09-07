@@ -58,7 +58,7 @@ export default function Method({ meta, stamp }) {
           <Row k="CIF factor">{meta.cif_basis}</Row>
           <Row k="Quantities">{meta.quantity_note}</Row>
           <Row k="Coverage">{meta.coverage}. Corridors below $250,000 and confidentiality buckets are excluded. Year-on-year comparisons use only partners present in every year.</Row>
-          <Row k="Classification">Lebanon reports in HS 2017; partners in HS 2022. About 350 six-digit codes changed between editions, so headline corridors are at HS-4, where the editions agree.</Row>
+          <Row k="Classification">{meta.classification ?? "Lebanon reports in HS 2017; partners in HS 2022. Partner codes are converted to HS 2017 with the official UNSD table before pairing."} Where a chapter balances but its headings gap in opposite directions, the two customs services are coding the same goods differently — the Products screen tags those lines rather than counting them as revenue.</Row>
           <Row k="Standing">Per the WCO, mirror gaps show where to investigate. They are risk indicators, not findings, and name no party as fraudulent.</Row>
         </dl>
       </Panel>

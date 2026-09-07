@@ -97,6 +97,15 @@ with ` 2` or ` (1)` in the name are collapsed to one file per reporter-year.
 Every year needs a Lebanon file (reporter 422); each partner file present for
 that year becomes a mirrored partner.
 
+Lebanon reports in HS 2017 and every partner in HS 2022. Before pairing, the
+pipeline converts partner codes with the official UNSD correlation table in
+`pipeline/hs/HS2022toHS2017.xlsx` (Conversions sheet for the target code,
+Correlations sheet for the relationship). Each HS-6 line carries `pc` — the
+code(s) the partner actually reported — and `map`: `same`, `recoded` (1:1
+renumbering), `merged` (several HS 2022 codes pooled into one HS 2017 code),
+`split` (the HS 2022 code could sit under more than one HS 2017 code; the
+table's convention was applied), or `unmapped`. Nothing is paired by prefix.
+
 **`mirror_gaps.json`** — `meta` (years, comparable partners, CIF factor, VAT
 rate, bands, caveats), `years[<year>]` (per-year totals, partner list, and a
 like-for-like `comparable` block), and `corridors[]`:
@@ -114,10 +123,10 @@ like-for-like `comparable` block), and `corridors[]`:
 ```
 
 **`mirror_hs6.json`** — `meta` and `rows[]`, one per partner × year × product
-code, compact keys: `y p hs6 lvl hs4 hs2 ch st x xc m g cv rd vat duty kg lv pv`.
-`st` is how the line was paired (`matched`, `matched_hs5`, `matched_hs4`,
-`partner_only`, `lebanon_only`); `rd` is the reading; `lv`/`pv` are the HS
-editions each side reported in.
+code, compact keys: `y p hs6 hs4 hs2 ch st x xc m g cv rd vat duty kg lv pv pc map`.
+`st` is whether the line paired (`matched`, `partner_only`, `lebanon_only`);
+`rd` is the reading; `lv`/`pv` are the HS editions each side reported in;
+`pc`/`map` are the partner's original code(s) and how they were placed.
 
 ### Going live
 
@@ -159,6 +168,7 @@ lib/
   format.js                money / percent / count formatters
 data/                      mirror_gaps.json, mirror_hs6.json
 pipeline/build_mirror.py   Comtrade bulk files -> both JSON files
+pipeline/hs/               UNSD HS 2022 -> HS 2017 correlation table
 middleware.js              the gate
 ```
 

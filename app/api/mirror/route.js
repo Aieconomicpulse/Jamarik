@@ -15,7 +15,9 @@ const NO_STORE = { "Cache-Control": "no-store" };
 
 function summarise(rows) {
   const s = {
-    lines: rows.length, matched: 0, matched_hs5: 0, matched_hs4: 0, partner_only: 0, lebanon_only: 0,
+    lines: rows.length, matched: 0, partner_only: 0, lebanon_only: 0,
+    // How the partner's HS-2022 codes were placed on HS 2017 (partner-side lines only).
+    by_map: { same: 0, recoded: 0, merged: 0, split: 0, unmapped: 0 },
     x_fob: 0, x_cif: 0, m: 0, gap: 0,
     vat_all: 0, vat_under: 0, vat_unrecorded: 0, vat_not_in_lebanon: 0,
     duty_under: 0,
@@ -24,6 +26,7 @@ function summarise(rows) {
   };
   for (const r of rows) {
     s[r.st] += 1;
+    if (r.x > 0 && r.map) s.by_map[r.map] = (s.by_map[r.map] || 0) + 1;
     s.x_fob += r.x; s.x_cif += r.xc; s.m += r.m; s.gap += r.g;
     s.vat_all += r.vat;
     if (r.g > 0 && (r.rd === "under_invoicing" || r.rd === "value_gap" || r.rd === "not_in_lebanon")) {
