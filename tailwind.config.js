@@ -23,6 +23,12 @@ module.exports = {
         gold2: "#6f5210", // gold hover — deeper still
         cedar: "#47703f", // normal / healthy — 5.7:1
         burgundy: "#a03636", // under-invoicing / flagged — 6.8:1
+        sea: "#1f6bc4", // largely unrecorded — 5.0:1
+        ground: "#f8f6ef", // page ground behind the white cards
+      },
+      boxShadow: {
+        // One soft lift for every card, so surfaces read as one system.
+        card: "0 1px 2px rgba(22, 19, 13, 0.04), 0 10px 30px -18px rgba(22, 19, 13, 0.25)",
       },
       fontFamily: {
         sans: ["IBM Plex Sans", "Helvetica Neue", "system-ui", "sans-serif"],

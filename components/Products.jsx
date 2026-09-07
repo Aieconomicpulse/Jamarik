@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { money } from "@/lib/format";
 import { LOSS_BY_KEY, REVENUE_READINGS, classifyCover } from "@/lib/losses";
-import { Chip, Metric, Panel, Select } from "@/components/ui";
+import { Bar, Button, Chip, Input, Panel, Segmented, Select, Skeleton, Tile } from "@/components/ui";
 
 // Product by product. What the partner says it exported to Lebanon, what
 // Lebanon registered, the difference, and the VAT that difference cost —
@@ -19,6 +19,11 @@ const READING = {
   over_invoicing: { label: "Lebanon declares more", tone: "neutral" },
   normal: { label: "Matches", tone: "cedar" },
   not_in_partner: { label: "Only in Lebanon's books", tone: "neutral" },
+};
+
+const BAR_TONE = {
+  under_invoicing: "burgundy", value_gap: "sea", not_in_lebanon: "sea",
+  over_invoicing: "slate", normal: "cedar", not_in_partner: "slate",
 };
 
 const LEVELS = [["2", "Chapter"], ["4", "HS-4"], ["6", "HS-6"]];
@@ -182,28 +187,26 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
         </div>
         <div>
           <div className="eyebrow mb-1.5">Product level</div>
-          <div className="flex">
-            {LEVELS.map(([k, l]) => (
-              <button key={k} onClick={() => reset(setLevel)(k)} aria-pressed={level === k}
-                className={`px-3 py-2 text-[12px] num border -ml-px first:ml-0 transition-colors ${
-                  level === k ? "border-gold bg-gold/10 text-gold relative z-10" : "border-rule text-slate1 hover:text-ink"
-                }`}>
-                {l}
-              </button>
-            ))}
-          </div>
+          <Segmented label="Product level" value={level} onChange={reset(setLevel)} options={LEVELS} />
         </div>
-        <div className="ml-auto flex items-center gap-4 text-[11.5px] text-slate2 num">
-          {fetchedAt && <span>as of {fetchedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
-          <button onClick={load} disabled={loading}
-            className="uppercase tracking-wider text-gold hover:text-gold2 disabled:opacity-40">
+        <div className="ml-auto flex items-center gap-3 text-[11.5px] text-slate2 num">
+          {fetchedAt && <span className="hidden sm:inline">as of {fetchedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+          <Button variant="ghost" icon="refresh" onClick={load} disabled={loading} title="Ask the data source again">
             {loading ? "Refreshing…" : "Refresh"}
-          </button>
+          </Button>
         </div>
       </div>
 
       {error && <div className="border border-burgundy/40 bg-burgundy/5 p-4 text-sm text-burgundy mb-6">{error}</div>}
-      {loading && !data && <div className="py-16 text-center eyebrow">Loading the mirror…</div>}
+      {loading && !data && (
+        <div aria-busy="true" aria-label="Loading the mirror">
+          <Skeleton className="h-6 w-3/4 mb-3" /><Skeleton className="h-6 w-1/2 mb-8" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[92px]" />)}
+          </div>
+          {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 mb-2" />)}
+        </div>
+      )}
 
       {s && (
         <>
@@ -220,11 +223,11 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             and the VAT not collected on those is <span className="num text-gold">{money(s.vat_lost)}</span>.
           </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-5 pb-6 mb-6 border-b border-rule">
-            <Metric size="lg" label={`${many ? "Partners" : name} exported`} value={money(s.x_cif)} sub={`${money(s.x_fob)} FOB, CIF-adjusted ×${avail?.meta?.cif_factor ?? 1.05}`} />
-            <Metric size="lg" label="Lebanon registered" value={money(s.m)} sub={s.cover == null ? "—" : `${Math.round(s.cover * 100)}% of the partner figure`} />
-            <Metric size="lg" label="Difference in total" value={money(s.gap)} tone={s.gap > 0 ? "burgundy" : "ink"} sub={s.gap > 0 ? "Lebanon registered less overall" : "Lebanon registered more overall"} />
-            <Metric size="lg" label="VAT not collected" value={money(s.vat_lost)} tone="gold" sub={`${Math.round(rate * 100)}% of ${money(s.shortfall)} short on ${s.revenue_lines.toLocaleString()} products`} />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+            <Tile label={`${many ? "Partners" : name} exported`} value={money(s.x_cif)} sub={`${money(s.x_fob)} FOB, CIF-adjusted ×${avail?.meta?.cif_factor ?? 1.05}`} />
+            <Tile label="Lebanon registered" value={money(s.m)} sub={s.cover == null ? "—" : `${Math.round(s.cover * 100)}% of the partner figure`} />
+            <Tile label="Difference in total" value={money(s.gap)} tone={s.gap > 0 ? "burgundy" : "ink"} sub={s.gap > 0 ? "Lebanon registered less overall" : "Lebanon registered more overall"} />
+            <Tile label="VAT not collected" value={money(s.vat_lost)} tone="gold" sub={`${Math.round(rate * 100)}% of ${money(s.shortfall)} short on ${s.revenue_lines.toLocaleString()} products`} />
           </div>
 
           {/* Match quality — the honesty strip */}
@@ -239,23 +242,11 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            <div className="flex">
-              {[["revenue", "Revenue lost"], ["all", "Every product"]].map(([k, l]) => (
-                <button key={k} onClick={() => reset(setScope)(k)} aria-pressed={scope === k}
-                  className={`px-3 py-2 text-[12px] num border -ml-px first:ml-0 ${
-                    scope === k ? "border-gold bg-gold/10 text-gold relative z-10" : "border-rule text-slate1 hover:text-ink"
-                  }`}>
-                  {l}
-                </button>
-              ))}
-            </div>
+            <Segmented label="Scope" value={scope} onChange={reset(setScope)}
+              options={[["revenue", "Revenue lost"], ["all", "Every product"]]} />
             <Select label="Chapter" value={chapter} onChange={reset(setChapter)}
               options={[["all", "All chapters"], ...chapters.map(([k, v]) => [k, `${k} · ${v}`])]} />
-            <input
-              value={search} onChange={(e) => reset(setSearch)(e.target.value)}
-              placeholder="HS code or product…"
-              className="bg-bone2 border border-rule text-ink text-[13px] px-3 py-2 num focus:outline-none focus:border-gold w-48"
-            />
+            <Input value={search} onChange={reset(setSearch)} placeholder="HS code or product…" className="w-52" />
             <div className="ml-auto text-[11.5px] text-slate2 num">
               {rows.length} {lvl === 2 ? "chapters" : lvl === 4 ? "headings" : "codes"} · exported {money(inView.xc)} · registered {money(inView.m)} · VAT {money(inView.vat)}
             </div>
@@ -265,7 +256,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
           <Panel>
             <div className="overflow-x-auto">
               <table className="dt">
-                <thead className="sticky top-0 bg-bone z-10">
+                <thead>
                   <tr>
                     <Th k="code" sort={sort} onSort={onSort}>Product</Th>
                     {many && <th>Partners</th>}
@@ -282,7 +273,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                     const isOpen = open === r.key;
                     return [
                       <tr key={r.key} onClick={() => setOpen(isOpen ? null : r.key)}
-                        className={`cursor-pointer ${isOpen ? "bg-bone2/60" : ""}`} aria-expanded={isOpen}>
+                        className={`cursor-pointer ${isOpen ? "[&>td]:bg-gold/5 [&>td:first-child]:shadow-[inset_3px_0_0_#8a6714]" : ""}`} aria-expanded={isOpen}>
                         <td>
                           <div className="flex items-baseline gap-2">
                             <span className="num text-[13px] text-ink">{r.code}</span>
@@ -294,14 +285,18 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                         </td>
                         {many && <td className="num text-[12px] text-slate1">{[...r.partners].map((p) => avail?.partners?.[year]?.find((x) => x.code === p)?.name ?? p).join(", ")}</td>}
                         <td className="text-right num">{r.xc ? money(r.xc) : <span className="text-slate2">—</span>}</td>
-                        <td className="text-right num">{r.m ? money(r.m) : <span className="text-slate2">—</span>}</td>
+                        <td className="text-right num">
+                          {r.m ? money(r.m) : <span className="text-slate2">—</span>}
+                          <Bar value={r.cv ?? 0} tone={BAR_TONE[r.rd] || "slate"} className="!w-20 ml-auto mt-1.5"
+                            title={r.cv == null ? "" : `${Math.round(r.cv * 100)}% of the partner figure`} />
+                        </td>
                         <td className={`text-right num ${r.g > 0 ? "text-burgundy" : "text-slate1"}`}>{money(r.g)}</td>
                         <td className="text-right num text-gold">{r.vat ? money(r.vat) : <span className="text-slate2">—</span>}</td>
                         <td><Chip tone={rd.tone}>{rd.label}</Chip></td>
                       </tr>,
                       isOpen && (
-                        <tr key={`${r.key}-detail`} className="bg-bone2/40">
-                          <td colSpan={many ? 7 : 6} className="!pt-2 !pb-5">
+                        <tr key={`${r.key}-detail`} className="[&>td]:bg-bone2/50 [&>td]:shadow-[inset_3px_0_0_#8a6714]">
+                          <td colSpan={many ? 7 : 6} className="!pt-3 !pb-5">
                             <Detail r={r} name={name} rate={rate} cif={avail?.meta?.cif_factor ?? 1.05} level={lvl} />
                           </td>
                         </tr>
@@ -316,15 +311,13 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             </div>
             {rows.length > limit && (
               <div className="px-5 py-3 border-t border-rule flex items-center gap-4">
-                <button onClick={() => setLimit((n) => n + PAGE)}
-                  className="text-[11px] uppercase tracking-wider num text-gold hover:text-gold2">
+                <Button variant="ghost" onClick={() => setLimit((n) => n + PAGE)}>
                   Show {Math.min(PAGE, rows.length - limit)} more
-                </button>
+                </Button>
                 <span className="text-[11px] text-slate2 num">{rows.length - limit} remaining</span>
-                <button onClick={() => setLimit(rows.length)}
-                  className="text-[11px] uppercase tracking-wider num text-slate1 hover:text-ink ml-auto">
+                <Button variant="quiet" onClick={() => setLimit(rows.length)} className="ml-auto">
                   Show all
-                </button>
+                </Button>
               </div>
             )}
           </Panel>

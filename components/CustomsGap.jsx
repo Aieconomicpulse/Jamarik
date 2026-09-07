@@ -8,17 +8,18 @@ import TradeDetective from "@/components/TradeDetective";
 import Method from "@/components/Method";
 import { money } from "@/lib/format";
 import { summary } from "@/lib/losses";
+import { Icon, Segmented } from "@/components/ui";
 
 // Products leads: one partner, one year, every product — exported, registered,
 // difference, VAT. Analytics gives the shape; the ledger is the audit surface
 // behind both. Any row on those screens opens the product view for that
 // partner and heading, which is what "focus" carries.
 const TABS = [
-  ["products", "Products"],
-  ["analytics", "Analytics"],
-  ["ledger", "Ledger"],
-  ["detective", "Detective"],
-  ["method", "Method"],
+  ["products", "Products", "package"],
+  ["analytics", "Analytics", "chart"],
+  ["ledger", "Ledger", "table"],
+  ["detective", "Detective", "search"],
+  ["method", "Method", "book"],
 ];
 
 export default function CustomsGap({ gaps, stamp }) {
@@ -77,73 +78,62 @@ export default function CustomsGap({ gaps, stamp }) {
   const partnersThisYear = (year === "all" ? meta.comparable_partners : gaps.years?.[year]?.partners) || [];
 
   return (
-    <div className="max-w-[1400px] mx-auto px-6 lg:px-10 py-8">
-      <header className="mb-6 grid lg:grid-cols-[minmax(0,1fr)_360px] gap-x-12 gap-y-4 items-end fade-in">
+    <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-8">
+      <header className="mb-6 grid lg:grid-cols-[minmax(0,1fr)_380px] gap-x-12 gap-y-4 items-end fade-in">
         <div>
-          <div className="eyebrow text-cedar mb-2">
+          <div className="eyebrow text-cedar mb-2.5">
             Trade-mirror forensics · Lebanon · {years.join(" & ")}
           </div>
-          <h1 className="display text-[30px] md:text-[36px] leading-[1.1] tracking-tightest text-ink">
+          <h1 className="display text-[32px] md:text-[40px] leading-[1.05] tracking-tightest text-ink">
             What customs is not collecting
           </h1>
         </div>
-        <p className="text-[13px] text-slate1 leading-relaxed lg:text-right">
+        <p className="text-[13.5px] text-slate1 leading-relaxed lg:text-right">
           What exporting countries say they sent to Lebanon, against what Lebanon registered.
           The difference is revenue not collected.
         </p>
       </header>
 
       {/* Year switch — one control, drives every tab below. */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mb-6 pb-5 border-b border-rule">
-        <div className="flex items-center gap-1">
-          <span className="eyebrow mr-2">Year</span>
-          {[...years.map(String), "all"].map((y) => (
-            <button
-              key={y}
-              onClick={() => setYear(y)}
-              aria-pressed={year === y}
-              className={`px-3 py-1.5 text-[12px] num border transition-colors ${
-                year === y
-                  ? "border-gold bg-gold/10 text-gold"
-                  : "border-rule text-slate1 hover:text-ink hover:border-slate2"
-              }`}
-            >
-              {y === "all" ? "Both" : y}
-            </button>
-          ))}
+      <div className="rounded-lg border border-rule bg-bone/80 shadow-card px-4 py-3 mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex items-center gap-3">
+          <span className="eyebrow">Year</span>
+          <Segmented label="Year" value={year} onChange={setYear}
+            options={[...years.map((y) => [String(y), String(y)]), ["all", "Both"]]} />
         </div>
-        <div className="text-[12px] text-slate1 num">
+        <div className="text-[12.5px] text-slate1 num hidden md:block">
           {partnersThisYear.map((p) => p.name).join(" · ")}
         </div>
-        <div className="text-[12px] text-slate1 num ml-auto">
-          <span className="text-ink">{money(s.fiscal)}</span> uncollected ·{" "}
+        <div className="text-[12.5px] text-slate1 num ml-auto">
+          <span className="text-ink font-medium">{money(s.fiscal)}</span> uncollected ·{" "}
           <span className="text-slate2">{money(s.outflow)} outflow</span> ·{" "}
           {s.flagged} of {s.corridors} corridors flagged
         </div>
       </div>
 
-      <nav className="flex items-center justify-between gap-4 mb-8 border-b border-rule" aria-label="Sections">
-        <div className="flex items-center gap-1">
-          {TABS.map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              aria-current={tab === key ? "page" : undefined}
-              className={`px-4 py-3 text-[12px] tracking-wide uppercase num border-b-2 -mb-px transition-colors ${
-                tab === key
-                  ? "border-gold text-gold"
-                  : "border-transparent text-slate1 hover:text-ink"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      {/* Sections. The selected one is filled gold; the rest wait quietly. */}
+      <nav aria-label="Sections" className="mb-8 -mx-5 px-5 lg:mx-0 lg:px-0 overflow-x-auto">
+        <div role="tablist" className="inline-flex gap-1 p-1 rounded-xl bg-bone2 border border-rule">
+          {TABS.map(([key, label, icon]) => {
+            const on = tab === key;
+            return (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={on}
+                onClick={() => setTab(key)}
+                className={`inline-flex items-center gap-2.5 h-11 px-4 md:px-5 rounded-lg text-[14px] md:text-[15px] font-medium tracking-wide cursor-pointer whitespace-nowrap transition-colors duration-150 ${
+                  on
+                    ? "bg-gold text-white shadow-sm"
+                    : "text-slate1 hover:text-ink hover:bg-bone"
+                }`}
+              >
+                <Icon name={icon} className="w-[18px] h-[18px]" />
+                {label}
+              </button>
+            );
+          })}
         </div>
-        {stamp && (
-          <div className="hidden md:block text-[11px] text-slate2 num pb-3" title={stamp.source}>
-            {stamp.live ? "Live" : `Snapshot ${stamp.generated}`} · {stamp.live ? "updates as declarations land" : "UN Comtrade bulk"}
-          </div>
-        )}
       </nav>
 
       {tab === "products" && <Products defaultYear={productYear} focus={focus} vatRate={meta.vat_rate} />}

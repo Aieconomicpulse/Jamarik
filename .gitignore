@@ -15,3 +15,6 @@ pipeline/cache/
 # Raw Comtrade downloads — 1 GB+, re-fetchable; the pipeline reads them in place
 collected data/
 __pycache__/
+
+# Skill bundles dropped into the folder for reference
+ui-ux-pro-max-skill-main*.zip

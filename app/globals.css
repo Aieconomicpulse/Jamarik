@@ -7,16 +7,24 @@
 }
 
 body {
-  background: #ffffff;
+  background: #f8f6ef;
   color: #16130d;
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   font-feature-settings: "ss01", "ss02", "tnum";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  /* faint paper grain — dark dots on the light ground */
-  background-image: radial-gradient(rgba(22, 19, 13, 0.045) 1px, transparent 1px);
+  line-height: 1.5;
+  /* faint paper grain — dark dots on the warm ground */
+  background-image: radial-gradient(rgba(22, 19, 13, 0.05) 1px, transparent 1px);
   background-size: 18px 18px;
   background-position: 0 0;
+}
+
+/* Keyboard users get the same gold as everything else that is "on". */
+:focus-visible {
+  outline: 2px solid #8a6714;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 @layer components {
@@ -54,18 +62,34 @@ body {
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: #7c7563;
-    padding: 10px 12px;
+    padding: 11px 14px;
     border-bottom: 1px solid #ded9ca;
+    background: #faf8f2;
     font-weight: 500;
+    white-space: nowrap;
   }
   .dt td {
-    padding: 11px 12px;
+    padding: 12px 14px;
     border-bottom: 1px solid rgba(222, 217, 202, 0.75);
-    vertical-align: top;
-    font-size: 14px;
+    vertical-align: middle;
+    font-size: 13.5px;
   }
-  .dt tr:hover td {
-    background: rgba(22, 19, 13, 0.035);
+  .dt tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .dt tbody tr td {
+    transition: background-color 150ms ease;
+  }
+  .dt tbody tr:hover td {
+    background: rgba(138, 103, 20, 0.05);
+  }
+
+  /* Loading placeholder */
+  .skeleton {
+    background: linear-gradient(90deg, #ece8dd 25%, #f5f2ea 50%, #ece8dd 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: 4px;
   }
 }
 
@@ -80,8 +104,30 @@ body {
   }
 }
 
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
 .fade-in {
-  animation: fadeUp 0.5s ease-out both;
+  animation: fadeUp 0.4s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .skeleton {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 /* Scrollbars inside the detective transcript */
@@ -90,6 +136,7 @@ body {
 }
 .thin-scroll::-webkit-scrollbar-thumb {
   background: #cfc9b6;
+  border-radius: 4px;
 }
 .thin-scroll::-webkit-scrollbar-track {
   background: transparent;

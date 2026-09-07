@@ -7,7 +7,7 @@ import {
 import { money, pct } from "@/lib/format";
 import { groupBy, summary } from "@/lib/losses";
 import { triage } from "@/lib/triage";
-import { Bar, Chip, Metric, Panel, PanelHead } from "@/components/ui";
+import { Bar, Chip, Panel, PanelHead, Segmented, Tile } from "@/components/ui";
 
 const AXIS = "#7c7563";
 const GRID = "rgba(222,217,202,0.9)";
@@ -61,13 +61,13 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
   return (
     <div className="fade-in">
       {/* Numbers first */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-5 pb-6 mb-8 border-b border-rule">
-        <Metric label="Revenue not collected" value={money(s.fiscal)} tone="gold" />
-        <Metric label="of which VAT" value={money(s.vat)} />
-        <Metric label="of which duty (indicative)" value={money(s.duty)} />
-        <Metric label="Corridors flagged" value={`${s.under.count + s.unrecorded.count} · ${pct(flaggedShare * 100, 0)}`} />
-        <Metric label="Under-declared" value={money(s.under.fiscal)} tone="burgundy" />
-        <Metric label="Unrecorded · verify" value={money(s.unrecorded.fiscal)} />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
+        <Tile label="Revenue not collected" value={money(s.fiscal)} tone="gold" />
+        <Tile label="of which VAT" value={money(s.vat)} />
+        <Tile label="of which duty (indicative)" value={money(s.duty)} />
+        <Tile label="Corridors flagged" value={`${s.under.count + s.unrecorded.count} · ${pct(flaggedShare * 100, 0)}`} />
+        <Tile label="Under-declared" value={money(s.under.fiscal)} tone="burgundy" />
+        <Tile label="Unrecorded · verify" value={money(s.unrecorded.fiscal)} tone="sea" />
       </div>
 
       {/* Shape of the problem */}
@@ -76,14 +76,8 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
           title="How much of what partners shipped did Lebanon record?"
           sub="Corridors by cover ratio · a healthy corridor sits near 100%"
           right={
-            <div className="flex gap-1">
-              {[["fiscal", "Revenue lost"], ["count", "Corridors"]].map(([k, l]) => (
-                <button key={k} onClick={() => setMeasure(k)} aria-pressed={measure === k}
-                  className={`px-2.5 py-1 text-[11px] num border ${measure === k ? "border-gold text-gold bg-gold/10" : "border-rule text-slate1 hover:text-ink"}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
+            <Segmented size="sm" label="Measure" value={measure} onChange={setMeasure}
+              options={[["fiscal", "Revenue lost"], ["count", "Corridors"]]} />
           }
         />
         <div className="px-4 pt-5 pb-3">
@@ -121,12 +115,12 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
             {chapters.map((r) => (
               <li key={r.key}>
                 <button onClick={() => onOpenProducts?.({ partner: "all", chapter: r.key })}
-                  className="w-full text-left group" title="Open every product in this chapter">
+                  className="w-full text-left group cursor-pointer rounded-md -mx-2 px-2 py-1 transition-colors hover:bg-gold/5" title="Open every product in this chapter">
                   <div className="flex items-baseline justify-between gap-3 mb-1">
-                    <span className="text-[13px] text-ink2 group-hover:text-gold transition-colors">{r.label} <span className="text-slate2 num text-[11px] ml-1">{r.key}</span></span>
+                    <span className="text-[13.5px] text-ink2 group-hover:text-gold transition-colors">{r.label} <span className="text-slate2 num text-[11px] ml-1">{r.key}</span></span>
                     <span className="num text-[13px] text-ink">{money(r.fiscal)}</span>
                   </div>
-                  <Bar value={r.fiscal / maxCh} tone="burgundy" />
+                    <Bar value={r.fiscal / maxCh} tone="burgundy" />
                 </button>
               </li>
             ))}
@@ -135,7 +129,7 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
         <Panel>
           <PanelHead title="By partner" sub="Origin as declared · revenue not collected · click for products"
             right={onOpenProducts && (
-              <button onClick={() => onOpenProducts({ partner: "all" })} className="text-[11px] uppercase tracking-wider num text-gold hover:text-gold2">
+              <button onClick={() => onOpenProducts({ partner: "all" })} className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[11px] uppercase tracking-wider num text-gold hover:text-gold2 hover:bg-gold/5 cursor-pointer transition-colors">
                 All products →
               </button>
             )} />
@@ -143,9 +137,9 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
             {partners.map((r) => (
               <li key={r.key}>
                 <button onClick={() => onOpenProducts?.({ partner: partnerCode[r.key] })}
-                  className="w-full text-left group" title={`Open ${r.key} product by product`}>
+                  className="w-full text-left group cursor-pointer rounded-md -mx-2 px-2 py-1 transition-colors hover:bg-gold/5" title={`Open ${r.key} product by product`}>
                   <div className="flex items-baseline justify-between gap-3 mb-1">
-                    <span className="text-[13px] text-ink2 group-hover:text-gold transition-colors">{r.key} <span className="text-slate2 num text-[11px] ml-1">{r.count} headings</span></span>
+                    <span className="text-[13.5px] text-ink2 group-hover:text-gold transition-colors">{r.key} <span className="text-slate2 num text-[11px] ml-1">{r.count} headings</span></span>
                     <span className="num text-[13px] text-ink">{money(r.fiscal)}</span>
                   </div>
                   <Bar value={r.fiscal / maxP} tone="burgundy" />
@@ -161,7 +155,7 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
       <Panel>
         <PanelHead title="Open these first" sub="Ranked by revenue at stake × strength of signal · click a row for its products"
           right={onOpenLedger && (
-            <button onClick={onOpenLedger} className="text-[11px] uppercase tracking-wider num text-slate1 hover:text-ink">
+            <button onClick={onOpenLedger} className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[11px] uppercase tracking-wider num text-slate1 hover:text-ink hover:bg-bone2 cursor-pointer transition-colors">
               Full ledger →
             </button>
           )} />

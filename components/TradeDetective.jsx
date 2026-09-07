@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Panel, PanelHead, Eyebrow } from "@/components/ui";
+import { Button, Panel, PanelHead, Eyebrow } from "@/components/ui";
 
 const STARTERS = [
   "Which products are losing Lebanon the most customs revenue?",
@@ -164,7 +164,7 @@ export default function TradeDetective({ data }) {
           {messages.map((m, i) =>
             m.role === "user" ? (
               <div key={i} className="flex justify-end">
-                <div className="bg-bone2 border border-rule px-4 py-2.5 text-[13.5px] text-ink max-w-[80%] leading-relaxed">
+                <div className="bg-gold/10 border border-gold/20 rounded-lg rounded-br-sm px-4 py-2.5 text-[13.5px] text-ink max-w-[80%] leading-relaxed">
                   {m.content}
                 </div>
               </div>
@@ -184,7 +184,7 @@ export default function TradeDetective({ data }) {
           )}
 
           {error && (
-            <div className="border border-burgundy/40 bg-burgundy/5 px-3 py-2.5 text-[13px] text-burgundy">
+            <div role="alert" className="rounded-md border border-burgundy/40 bg-burgundy/5 px-3 py-2.5 text-[13px] text-burgundy">
               {error}
             </div>
           )}
@@ -202,15 +202,11 @@ export default function TradeDetective({ data }) {
               }
             }}
             placeholder="Ask the Trade Detective…"
-            className="flex-1 resize-none bg-bone2 border border-rule text-ink text-[13.5px] px-3 py-2.5 leading-relaxed focus:outline-none focus:border-gold placeholder:text-slate2"
+            className="flex-1 resize-none min-h-[40px] rounded-md bg-bone border border-rule text-ink text-[13.5px] px-3 py-2.5 leading-relaxed transition-colors hover:border-slate2 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/25 placeholder:text-slate2"
           />
-          <button
-            onClick={() => send(draft)}
-            disabled={busy || !draft.trim()}
-            className="shrink-0 bg-ink text-bone px-4 py-2.5 text-[12px] uppercase tracking-wide num disabled:opacity-40 hover:bg-cedar transition-colors"
-          >
-            Ask
-          </button>
+          <Button icon="send" onClick={() => send(draft)} disabled={busy || !draft.trim()} className="shrink-0">
+            {busy ? "Working…" : "Ask"}
+          </Button>
         </div>
       </Panel>
 
@@ -221,7 +217,7 @@ export default function TradeDetective({ data }) {
             key={s}
             onClick={() => send(s)}
             disabled={busy}
-            className="w-full text-left border border-rule bg-bone hover:bg-bone2/40 hover:border-gold/50 transition-colors px-4 py-3 text-[13px] text-ink2 leading-snug disabled:opacity-50"
+            className="w-full text-left rounded-lg border border-rule bg-bone shadow-card hover:bg-gold/5 hover:border-gold/50 cursor-pointer transition-colors px-4 py-3 text-[13px] text-ink2 leading-snug disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {s}
           </button>

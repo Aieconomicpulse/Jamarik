@@ -87,7 +87,7 @@ export default function GapForensics({ data, onOpenProducts }) {
       <Panel>
         <div className="overflow-x-auto">
           <table className="dt">
-            <thead className="sticky top-0 bg-bone z-10">
+            <thead>
               <tr>
                 <th>Partner</th>
                 <th>Corridor</th>
@@ -140,7 +140,7 @@ export default function GapForensics({ data, onOpenProducts }) {
           <div className="px-5 py-3 border-t border-rule">
             <button
               onClick={() => setLimit((n) => n + PAGE_STEP)}
-              className="text-[11px] uppercase tracking-wider num text-gold hover:text-gold2"
+              className="inline-flex items-center h-9 px-3 rounded-md border border-rule bg-bone text-[11px] uppercase tracking-wider num text-ink hover:bg-bone2 cursor-pointer transition-colors"
             >
               Show more ({rows.length - limit} remaining)
             </button>
