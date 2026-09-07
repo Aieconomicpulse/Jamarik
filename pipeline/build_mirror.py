@@ -1,33 +1,32 @@
 #!/usr/bin/env python3
 """
-Build Jamarik's mirror_gaps.json from UN Comtrade bulk files.
+Jamarik data build — multi-year, three loss types, VAT and duty.
 
-Input : COMTRADE FINAL bulk files (C_A_<cls>_<reporter>_<year>.gz), one per
-        reporter-year, as downloaded from the Comtrade bulk API.
-Output: data/mirror_gaps.json in the schema the portal already reads.
+Reads UN Comtrade bulk files (one per reporter-year) and produces
+data/mirror_gaps.json: every partner x HS-4 corridor, for every year available,
+with the fiscal loss split into the three things it can actually be.
 
-Three things this does that a naive mirror does not:
+The split is the point. A corridor where Lebanon declared 60% of what the
+partner shipped and one where it declared 4% carry similar VAT arithmetic and
+mean entirely different things. Summing them hands a minister a number that
+falls apart under the first challenge.
 
-1. De-duplicates. The bulk files interleave as-reported rows with Comtrade's
-   own rollups (HS-2, HS-4, TOTAL, World partner) and, for some reporters,
-   a mode-of-transport breakdown. Summing the file raw inflates Lebanon's
-   total by more than 80%.
+  under_invoicing  cover 0.40-0.85   goods arrived, price short   -> VAT + duty uncollected
+  value_gap        cover < 0.40      barely recorded at all       -> verify origin first
+  over_invoicing   cover > 1.60      Lebanon records more         -> not customs revenue;
+                                                                     a capital-outflow signal
+  normal           everything else   ordinary asymmetry           -> not flagged
 
-2. Compares like with like. Lebanon reports CIF, partners report FOB. Rather
-   than applying a textbook 1.08, we measure each corridor's own wedge from
-   the median of its matched product lines, and calibrate against that.
-
-3. Refuses to name a mechanism it cannot evidence. Lebanon publishes no
-   genuine net weight to Comtrade — every non-zero weight on its import rows
-   is a UN estimate. Distinguishing under-invoicing from non-declaration
-   requires real quantities, so corridors are flagged by value only and the
-   output says so.
+Usage:
+  python build_v2.py --out data/mirror_gaps.json --dir all/
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
+from collections import defaultdict
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -35,39 +34,85 @@ import pandas as pd
 
 LEBANON = 422
 VAT_RATE = 0.11
-
-# Confidentiality and residual buckets — real trade, but not attributable to a
-# product, so a gap on these lines means nothing.
-EXCLUDED_HS4 = {"9999", "9880", "9999"}
-
-# A partner line must clear this to be worth an officer's attention.
+CIF_FACTOR = 1.05          # documented constant — see note in meta
 MIN_PARTNER_VALUE = 250_000
+EXCLUDED_HS4 = {"9999", "9880"}
 
-# Lines below this are too small to inform the freight wedge, but everything
-# above it counts — breadth is what makes the median robust.
-CALIBRATION_FLOOR = 25_000
+UNDER_LO, UNDER_HI = 0.40, 0.85
+OVER_RATIO = 1.60
 
-# The CIF/FOB wedge. Held as a documented constant rather than fitted to the
-# data — see corridor_diagnostics() for why fitting it is circular. 1.05 is the
-# conservative end of the range used in the trade-statistics literature for
-# short-haul maritime freight and insurance, so it understates gaps rather than
-# inflating them.
-CIF_FACTOR = 1.05
+# Indicative duty rates by HS chapter. Lebanon's applied tariff is mostly 0-5%
+# with higher bands on finished consumer goods and vehicles. These are ORDER OF
+# MAGNITUDE ONLY and are labelled as such everywhere they surface — the real
+# schedule carries excise, exemptions and free-trade preferences this cannot see.
+DUTY_BANDS = {
+    "default": 0.05,
+    0.00: ["10", "27", "29", "30", "31", "47", "72", "84", "85", "90"],   # inputs, fuel, pharma, machinery
+    0.10: ["17", "19", "20", "21", "32", "33", "34", "39", "48", "69", "70", "73", "76", "83", "94", "96"],
+    0.20: ["22", "42", "61", "62", "63", "64", "65", "66", "87", "91", "95"],  # finished consumer goods
+    0.35: ["24"],                                                          # tobacco, before excise
+}
 
-# Cover ratio = what Lebanon declared / what we would expect given the partner.
-# The bands below are deliberately conservative, and the reasoning is in the
-# labels: a line covering 40-85% of expected value looks like mis-pricing; a
-# line covering under 40% is far more likely to be goods that never arrived
-# under that origin at all — re-consignment, transit, or a hub credit — than a
-# declaration filed at a tenth of its worth.
-UNDER_INVOICING_BAND = (0.40, 0.85)
-UNEXPLAINED_CEILING = 0.40
-OVER_DECLARATION_RATIO = 1.60
 
+def duty_rate(hs2: str) -> float:
+    for rate, chapters in DUTY_BANDS.items():
+        if rate != "default" and hs2 in chapters:
+            return rate
+    return DUTY_BANDS["default"]
+
+
+CHAPTERS = {
+    "01": "Live animals", "02": "Meat", "03": "Fish & seafood", "04": "Dairy & eggs",
+    "05": "Animal products", "06": "Live plants & flowers", "07": "Vegetables",
+    "08": "Fruit & nuts", "09": "Coffee, tea & spices", "10": "Cereals",
+    "11": "Milling products", "12": "Oil seeds", "13": "Gums & resins",
+    "14": "Vegetable plaiting", "15": "Fats & oils", "16": "Prepared meat & fish",
+    "17": "Sugar", "18": "Cocoa", "19": "Cereal preparations", "20": "Prepared vegetables",
+    "21": "Food preparations", "22": "Beverages & spirits", "23": "Animal feed",
+    "24": "Tobacco", "25": "Salt, stone & cement", "26": "Ores & slag",
+    "27": "Mineral fuels", "28": "Inorganic chemicals", "29": "Organic chemicals",
+    "30": "Pharmaceuticals", "31": "Fertilisers", "32": "Paints & dyes",
+    "33": "Cosmetics & perfumery", "34": "Soaps & detergents", "35": "Albuminoids",
+    "36": "Explosives", "37": "Photographic goods", "38": "Chemical products",
+    "39": "Plastics", "40": "Rubber", "41": "Raw hides", "42": "Leather articles",
+    "43": "Furskins", "44": "Wood", "45": "Cork", "46": "Basketware", "47": "Wood pulp",
+    "48": "Paper", "49": "Printed matter", "50": "Silk", "51": "Wool",
+    "52": "Cotton", "53": "Other vegetable fibres", "54": "Man-made filaments",
+    "55": "Man-made staple fibres", "56": "Wadding & nonwovens", "57": "Carpets",
+    "58": "Special woven fabrics", "59": "Coated fabrics", "60": "Knitted fabrics",
+    "61": "Knitted apparel", "62": "Woven apparel", "63": "Textile articles",
+    "64": "Footwear", "65": "Headgear", "66": "Umbrellas", "67": "Artificial flowers",
+    "68": "Stone articles", "69": "Ceramics", "70": "Glass", "71": "Precious stones",
+    "72": "Iron & steel", "73": "Iron/steel articles", "74": "Copper", "75": "Nickel",
+    "76": "Aluminium", "78": "Lead", "79": "Zinc", "80": "Tin", "81": "Other base metals",
+    "82": "Tools", "83": "Base metal articles", "84": "Machinery",
+    "85": "Electrical machinery", "86": "Railway equipment", "87": "Vehicles",
+    "88": "Aircraft", "89": "Ships", "90": "Optical & medical", "91": "Clocks & watches",
+    "92": "Musical instruments", "93": "Arms & ammunition", "94": "Furniture & lighting",
+    "95": "Toys & sports", "96": "Misc manufactures", "97": "Works of art",
+}
+
+HUBS = {784, 344, 792}  # re-export hubs: their "exports" to Lebanon are largely
+                       # goods of other origin, so a gap there reads differently
+
+COUNTRY = {
+    156: "China", 300: "Greece", 380: "Italy", 422: "Lebanon",
+    682: "Saudi Arabia", 784: "UAE", 842: "United States",
+}
+
+
+# --------------------------------------------------------------------------- #
 
 def read_bulk(path: Path) -> pd.DataFrame:
-    """Read one bulk file and keep only genuine, non-overlapping detail rows."""
-    df = pd.read_csv(path, sep="\t", dtype={"cmdCode": str, "period": str}, low_memory=False)
+    """
+    One reporter-year, reduced to genuine non-overlapping detail rows.
+
+    The bulk files interleave as-reported rows with Comtrade's own rollups
+    (HS-2, HS-4, TOTAL, 'World' partner) and, for some reporters, a breakdown by
+    mode of transport. This filter yields exactly one row per reporter x flow x
+    partner x HS-6 and reconciles to the file's own TOTAL row to the dollar.
+    """
+    df = pd.read_csv(path, sep="\t", dtype={"cmdCode": str}, low_memory=False)
     keep = (
         (df["cmdCode"].str.len() == 6)
         & (df["partnerCode"] != 0)
@@ -78,243 +123,355 @@ def read_bulk(path: Path) -> pd.DataFrame:
     return df.loc[keep].copy()
 
 
-def corridor_frame(lebanon: pd.DataFrame, partner: pd.DataFrame, partner_code: int) -> pd.DataFrame:
-    """One row per HS-4 heading, both sides of the mirror side by side."""
-    leb = lebanon[(lebanon.flowCode == "M") & (lebanon.partnerCode == partner_code)].copy()
-    ptr = partner[(partner.flowCode == "X") & (partner.partnerCode == LEBANON)].copy()
-    if leb.empty or ptr.empty:
-        return pd.DataFrame()
-
-    leb["hs4"] = leb.cmdCode.str[:4]
-    ptr["hs4"] = ptr.cmdCode.str[:4]
-
-    a = leb.groupby("hs4").agg(m=("primaryValue", "sum"))
-    b = ptr.groupby("hs4").agg(x_fob=("primaryValue", "sum"), x_kg=("netWgt", "sum"))
-    return a.join(b, how="outer").fillna(0.0).reset_index()
-
-
-def corridor_diagnostics(frame: pd.DataFrame) -> dict:
-    """
-    Observed ratio statistics for a corridor — reported, never used as the
-    baseline.
-
-    An earlier version calibrated the CIF/FOB wedge from this median. That is
-    circular: if a corridor is systematically under-declared, the median ratio
-    is depressed by the under-declaration, and using it as the baseline defines
-    the problem out of existence. On Greece and the USA the observed median sits
-    at 0.94 and 0.88 — below parity before freight is even added — which is
-    itself the finding, not the yardstick.
-
-    So the wedge is a documented external constant and this function only
-    describes what the data looks like against it.
-    """
-    matched = frame[(frame.m > 0) & (frame.x_fob > CALIBRATION_FLOOR)]
-    if matched.empty:
-        return {"matched_lines": 0, "observed_median_ratio": None}
-    ratio = matched.m / matched.x_fob
-    return {
-        "matched_lines": int(len(matched)),
-        "observed_median_ratio": round(float(ratio.median()), 3),
-        "observed_p25": round(float(ratio.quantile(0.25)), 3),
-        "observed_p75": round(float(ratio.quantile(0.75)), 3),
-        "value_weighted_ratio": round(float(matched.m.sum() / matched.x_fob.sum()), 3),
-    }
-
-
 def classify(cover: float) -> str:
-    lo, hi = UNDER_INVOICING_BAND
-    if cover >= OVER_DECLARATION_RATIO:
+    if cover >= OVER_RATIO:
         return "over_invoicing"
-    if cover < UNEXPLAINED_CEILING:
+    if cover < UNDER_LO:
         return "value_gap"
-    if cover < hi:
+    if cover < UNDER_HI:
         return "under_invoicing"
     return "normal"
 
 
-def build(files: dict[int, Path], names: dict[int, str], year: int, out: Path) -> dict:
-    lebanon_path = files.pop(LEBANON)
-    lebanon = read_bulk(lebanon_path)
+def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
+                  code: int, year: int) -> list[dict]:
+    leb = lebanon[(lebanon.flowCode == "M") & (lebanon.partnerCode == code)].copy()
+    ptr = partner[(partner.flowCode == "X") & (partner.partnerCode == LEBANON)].copy()
+    if leb.empty or ptr.empty:
+        return []
 
-    corridors: list[dict] = []
-    factors: dict[str, float] = {}
-    reporters: list[dict] = []
+    leb["hs4"] = leb.cmdCode.str[:4]
+    ptr["hs4"] = ptr.cmdCode.str[:4]
+    a = leb.groupby("hs4").primaryValue.sum().rename("m")
+    b = ptr.groupby("hs4").agg(x_fob=("primaryValue", "sum"), x_kg=("netWgt", "sum"))
+    frame = pd.concat([a, b], axis=1).fillna(0.0).reset_index()
+    frame = frame[(frame.x_fob >= MIN_PARTNER_VALUE) & (~frame.hs4.isin(EXCLUDED_HS4))]
 
-    for code, path in files.items():
-        partner = read_bulk(path)
-        frame = corridor_frame(lebanon, partner, code)
-        if frame.empty:
-            reporters.append({"code": code, "name": names[code], "has_data": False})
-            continue
+    out = []
+    for r in frame.itertuples():
+        x_cif = r.x_fob * CIF_FACTOR
+        gap = x_cif - r.m                       # positive = Lebanon declared less
+        cover = r.m / x_cif if x_cif else 0.0
+        sig = classify(cover)
+        hs2 = r.hs4[:2]
+        rate = duty_rate(hs2)
 
-        factor = CIF_FACTOR
-        factors[str(code)] = corridor_diagnostics(frame)
-        reporters.append({"code": code, "name": names[code], "has_data": True})
+        # Fiscal loss only where Lebanon declared LESS. Over-declaration is not a
+        # revenue loss — it is money leaving, counted separately.
+        shortfall = max(gap, 0.0) if sig in ("under_invoicing", "value_gap") else 0.0
+        # Over-declared value is the outflow measure: what Lebanon recorded above
+        # anything a partner reports shipping.
+        outflow = max(-gap, 0.0) if sig == "over_invoicing" else 0.0
 
-        frame = frame[
-            (~frame.hs4.isin(EXCLUDED_HS4)) & (frame.x_fob >= MIN_PARTNER_VALUE)
-        ].copy()
-
-        frame["x_cif"] = frame.x_fob * factor
-        frame["gap"] = frame.x_cif - frame.m           # positive = Lebanon declared less
-        frame["cover"] = frame.m / frame.x_cif
-        frame["gap_pct"] = 100 * frame.gap / frame.x_cif
-        frame["signature"] = frame.cover.map(classify)
-        # VAT is only recoverable where value was under-declared.
-        frame["vat_floor"] = (frame.gap.clip(lower=0) * VAT_RATE).where(
-            frame.signature.isin(["under_invoicing", "value_gap"]), 0.0
-        )
-
-        for r in frame.itertuples():
-            corridors.append(
-                {
-                    "partner": code,
-                    "partnerName": names[code],
-                    "hs4": r.hs4,
-                    "hs2": r.hs4[:2],
-                    "chapter": CHAPTERS.get(r.hs4[:2], f"Chapter {r.hs4[:2]}"),
-                    "label": f"HS {r.hs4}",
-                    "x_fob": round(r.x_fob, 2),
-                    "x_cif": round(r.x_cif, 2),
-                    "m": round(r.m, 2),
-                    "gap": round(r.gap, 2),
-                    "gap_pct": round(r.gap_pct, 1),
-                    "cover": round(r.cover, 3),
-                    # Lebanon publishes no genuine net weight, so no corridor can
-                    # carry a quantity gap. Null is the honest value.
-                    "qty_gap_pct": None,
-                    "partner_kg": round(r.x_kg, 1) if r.x_kg else None,
-                    "signature": r.signature,
-                    "vat_floor": round(r.vat_floor, 2),
-                    "duty_loss_indicative": round(max(r.gap, 0) * 0.05, 2),
-                    "cif_factor": round(factor, 4),
-                    "confidence": "medium" if r.x_fob > 1e6 else "low",
-                }
-            )
-
-    corridors.sort(key=lambda c: abs(c["gap"]), reverse=True)
-
-    flagged = [c for c in corridors if c["signature"] != "normal"]
-    sig_counts: dict[str, int] = {}
-    for c in corridors:
-        sig_counts[c["signature"]] = sig_counts.get(c["signature"], 0) + 1
-    for key in ("under_invoicing", "value_gap", "over_invoicing", "normal"):
-        sig_counts.setdefault(key, 0)
-    sig_counts.setdefault("smuggling_risk", 0)  # unusable without real quantities
-
-    payload = {
-        "meta": {
-            "demo": False,
+        out.append({
             "year": year,
-            "generated": date.today().isoformat(),
-            "retrieved": datetime.now(timezone.utc).isoformat(),
-            "source": "UN Comtrade bulk FINAL files (comtradeapi.un.org)",
-            "coverage": "PARTIAL — only the partners listed below are mirrored",
-            "cif_factor": CIF_FACTOR,
-            "cif_basis": "documented constant, not fitted — see diagnostics",
-            "diagnostics": factors,
-            "vat_rate": VAT_RATE,
-            "reporters": reporters,
-            "signatures": {
-                "under_invoicing": "Value under-declared",
-                "value_gap": "Largely unrecorded",
-                "over_invoicing": "Lebanon declares more",
-                "smuggling_risk": "Goods not presented",
-                "normal": "Within normal asymmetry",
-            },
-            "quantity_available": False,
-            "quantity_note": (
-                "Lebanon publishes no genuine net weight to Comtrade — every non-zero "
-                "weight on its import rows is a UN estimate. Mechanisms that depend on "
-                "quantity cannot be evidenced from public data; declaration-level "
-                "weights are required."
-            ),
-            "duty_note": (
-                "Duty-inclusive losses use an INDICATIVE flat rate — verify against the "
-                "Lebanese tariff and excise schedules before citing."
-            ),
-        },
-        "totals": {
-            "x_cif": round(sum(c["x_cif"] for c in corridors), 2),
-            "m": round(sum(c["m"] for c in corridors), 2),
-            "gap_pos": round(sum(c["gap"] for c in flagged if c["gap"] > 0), 2),
-            "vat_floor": round(sum(c["vat_floor"] for c in corridors), 2),
-            "duty_loss": round(sum(c["duty_loss_indicative"] for c in flagged), 2),
-        },
-        "sig_counts": sig_counts,
-        "corridors": corridors,
+            "partner": code,
+            "partnerName": COUNTRY.get(code, str(code)),
+            "hs4": r.hs4,
+            "hs2": hs2,
+            "chapter": CHAPTERS.get(hs2, f"Chapter {hs2}"),
+            "label": f"HS {r.hs4}",
+            "x_fob": round(r.x_fob, 2),
+            "x_cif": round(x_cif, 2),
+            "m": round(r.m, 2),
+            "gap": round(gap, 2),
+            "gap_pct": round(100 * gap / x_cif, 1) if x_cif else 0.0,
+            "cover": round(cover, 3),
+            "qty_gap_pct": None,                # Lebanon publishes no genuine weights
+            "partner_kg": round(r.x_kg, 1) if r.x_kg else None,
+            "signature": sig,
+            "shortfall": round(shortfall, 2),
+            "outflow": round(outflow, 2),
+            "vat_floor": round(shortfall * VAT_RATE, 2),
+            "duty_rate": rate,
+            "duty_loss": round(shortfall * rate, 2),
+            "fiscal_loss": round(shortfall * (VAT_RATE + rate), 2),
+            "confidence": "medium" if r.x_fob > 1e6 else "low",
+            "hub": code in HUBS,
+        })
+    return out
+
+
+def summarise(rows: list[dict]) -> dict:
+    def s(key, pred=lambda c: True):
+        return round(sum(c[key] for c in rows if pred(c)), 2)
+    is_under = lambda c: c["signature"] == "under_invoicing"      # noqa: E731
+    is_gap = lambda c: c["signature"] == "value_gap"              # noqa: E731
+    is_over = lambda c: c["signature"] == "over_invoicing"        # noqa: E731
+    counts = defaultdict(int)
+    for c in rows:
+        counts[c["signature"]] += 1
+    return {
+        "corridors": len(rows),
+        "x_cif": s("x_cif"),
+        "m": s("m"),
+        "under": {"count": counts["under_invoicing"], "shortfall": s("shortfall", is_under),
+                  "vat": s("vat_floor", is_under), "duty": s("duty_loss", is_under),
+                  "fiscal": s("fiscal_loss", is_under)},
+        "unrecorded": {"count": counts["value_gap"], "shortfall": s("shortfall", is_gap),
+                       "vat": s("vat_floor", is_gap), "duty": s("duty_loss", is_gap),
+                       "fiscal": s("fiscal_loss", is_gap)},
+        "over": {"count": counts["over_invoicing"], "outflow": s("outflow", is_over)},
+        "normal": {"count": counts["normal"]},
+        "vat_floor": s("vat_floor"),
+        "duty_loss": s("duty_loss"),
+        "fiscal_loss": s("fiscal_loss"),
     }
-
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(payload, indent=1))
-    return payload
-
-
-CHAPTERS = {
-    "02": "Meat", "04": "Dairy & eggs", "07": "Vegetables", "08": "Fruit & nuts",
-    "10": "Cereals", "11": "Milling products", "12": "Oil seeds", "15": "Fats & oils",
-    "17": "Sugar", "18": "Cocoa", "19": "Cereal preparations", "20": "Prepared vegetables",
-    "21": "Food preparations", "22": "Beverages & spirits", "23": "Animal feed",
-    "24": "Tobacco", "25": "Salt, stone & cement", "27": "Mineral fuels",
-    "28": "Inorganic chemicals", "29": "Organic chemicals", "30": "Pharmaceuticals",
-    "31": "Fertilisers", "32": "Paints & dyes", "33": "Cosmetics & perfumery",
-    "34": "Soaps & detergents", "38": "Chemical products", "39": "Plastics",
-    "40": "Rubber", "44": "Wood", "48": "Paper", "49": "Printed matter",
-    "52": "Cotton", "61": "Knitted apparel", "62": "Woven apparel", "63": "Textile articles",
-    "64": "Footwear", "68": "Stone articles", "69": "Ceramics", "70": "Glass",
-    "71": "Precious stones & metals", "72": "Iron & steel", "73": "Iron/steel articles",
-    "74": "Copper", "76": "Aluminium", "82": "Tools", "83": "Base metal articles",
-    "84": "Machinery", "85": "Electrical machinery", "87": "Vehicles",
-    "88": "Aircraft", "89": "Ships", "90": "Optical & medical", "94": "Furniture",
-    "95": "Toys & sports", "96": "Miscellaneous manufactures",
-    "03": "Fish & seafood", "05": "Animal products", "06": "Live plants & flowers",
-    "09": "Coffee, tea & spices", "13": "Gums & resins", "14": "Vegetable plaiting materials",
-    "16": "Prepared meat & fish", "26": "Ores & slag", "35": "Albuminoids & glues",
-    "36": "Explosives & pyrotechnics", "37": "Photographic goods", "41": "Raw hides & leather",
-    "42": "Leather articles", "43": "Furskins", "45": "Cork", "46": "Basketware",
-    "47": "Pulp of wood", "50": "Silk", "51": "Wool", "53": "Other vegetable fibres",
-    "54": "Man-made filaments", "55": "Man-made staple fibres", "56": "Wadding & nonwovens",
-    "57": "Carpets", "58": "Special woven fabrics", "59": "Coated textile fabrics",
-    "60": "Knitted fabrics", "65": "Headgear", "66": "Umbrellas", "67": "Feathers & artificial flowers",
-    "75": "Nickel", "78": "Lead", "79": "Zinc", "80": "Tin", "81": "Other base metals",
-    "86": "Railway equipment", "91": "Clocks & watches", "92": "Musical instruments",
-    "93": "Arms & ammunition", "97": "Works of art",
-}
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--year", type=int, required=True)
-    ap.add_argument("--out", type=Path, default=Path("data/mirror_gaps.json"))
-    ap.add_argument("--file", action="append", required=True,
-                    metavar="CODE:NAME:PATH",
-                    help="Reporter code, display name and bulk file path. Repeat per country.")
+    ap.add_argument("--dir", type=Path, default=Path("all"))
+    ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
-    files: dict[int, Path] = {}
-    names: dict[int, str] = {}
-    for spec in args.file:
-        code, name, path = spec.split(":", 2)
-        files[int(code)] = Path(path)
-        names[int(code)] = name
+    # Discover reporter-year files by name: <Name>_<code>_<class>_<year>.csv
+    files: dict[int, dict[int, Path]] = defaultdict(dict)
+    for p in sorted(args.dir.glob("*.csv")):
+        m = re.match(r".+_(\d+)_(H\d)_(\d{4})\.csv$", p.name)
+        if m:
+            files[int(m.group(3))][int(m.group(1))] = p
 
-    if LEBANON not in files:
-        raise SystemExit("A Lebanon file (code 422) is required.")
+    years = sorted(y for y, f in files.items() if LEBANON in f)
+    print(f"Years with a Lebanon file: {years}")
 
-    payload = build(files, names, args.year, args.out)
-    t = payload["totals"]
-    print(f"{len(payload['corridors'])} corridors -> {args.out}")
-    print(f"  partners reported ${t['x_cif']/1e6:,.1f}M (CIF-adjusted)")
-    print(f"  Lebanon declared  ${t['m']/1e6:,.1f}M")
-    print(f"  shortfall on flagged lines ${t['gap_pos']/1e6:,.1f}M")
-    print(f"  VAT floor ${t['vat_floor']/1e6:,.1f}M")
-    print(f"  signatures: {payload['sig_counts']}")
-    print(f"  CIF factor: {payload['meta']['cif_factor']} (documented constant)")
-    for k, v in payload["meta"]["diagnostics"].items():
-        print(f"  observed ratio {k}: median {v['observed_median_ratio']} "
-              f"(p25 {v['observed_p25']} - p75 {v['observed_p75']}), "
-              f"value-weighted {v['value_weighted_ratio']}, n={v['matched_lines']}")
+    corridors: list[dict] = []
+    per_year: dict[str, dict] = {}
+    partners_by_year: dict[int, list[int]] = {}
+
+    for year in years:
+        leb = read_bulk(files[year][LEBANON])
+        rows_this_year: list[dict] = []
+        got = []
+        for code, path in files[year].items():
+            if code == LEBANON:
+                continue
+            rows = corridors_for(leb, read_bulk(path), code, year)
+            if rows:
+                rows_this_year.extend(rows)
+                got.append(code)
+                print(f"  {year} {COUNTRY.get(code, code):<15} {len(rows):>4} corridors")
+        partners_by_year[year] = got
+        corridors.extend(rows_this_year)
+        per_year[str(year)] = summarise(rows_this_year)
+        per_year[str(year)]["partners"] = [
+            {"code": c, "name": COUNTRY.get(c, str(c)), "hub": c in HUBS} for c in got
+        ]
+
+    # Partners present in every year — the only set where a year-on-year
+    # comparison is like-for-like.
+    comparable = sorted(set.intersection(*(set(v) for v in partners_by_year.values()))) \
+        if len(partners_by_year) > 1 else sorted(partners_by_year.get(years[0], []))
+    print(f"\n  comparable partner set: {[COUNTRY.get(c) for c in comparable]}")
+
+    # Persistence: a heading flagged in every year it could have been is a
+    # pattern; one flagged in a single year is usually noise or a reclassification.
+    seen: dict[tuple, set] = defaultdict(set)
+    flagged_in: dict[tuple, set] = defaultdict(set)
+    for c in corridors:
+        key = (c["partner"], c["hs4"])
+        seen[key].add(c["year"])
+        if c["signature"] in ("under_invoicing", "value_gap"):
+            flagged_in[key].add(c["year"])
+    for c in corridors:
+        key = (c["partner"], c["hs4"])
+        c["years_seen"] = len(seen[key])
+        c["years_flagged"] = len(flagged_in[key])
+        c["persistent"] = len(flagged_in[key]) > 1
+
+    # Year-on-year is only honest across the partners present in every year.
+    # 2023 carries the UAE and the USA, 2024 carries Saudi Arabia; comparing raw
+    # totals across those sets would show a fall that is a coverage change, not
+    # a policy result.
+    for year in years:
+        rows = [c for c in corridors if c["year"] == year and c["partner"] in comparable]
+        per_year[str(year)]["comparable"] = summarise(rows)
+
+    corridors.sort(key=lambda c: (-c["year"], -abs(c["gap"])))
+
+    payload = {
+        "meta": {
+            "demo": False,
+            "years": years,
+            "base_year": years[-1],
+            "comparable_partners": [
+                {"code": c, "name": COUNTRY.get(c, str(c))} for c in comparable
+            ],
+            "generated": date.today().isoformat(),
+            "retrieved": datetime.now(timezone.utc).isoformat(),
+            "source": "UN Comtrade bulk FINAL files (comtradeapi.un.org)",
+            "coverage": "PARTIAL — only the partners listed per year are mirrored",
+            "cif_factor": CIF_FACTOR,
+            "cif_basis": (
+                "Documented constant, not fitted. Fitting it to this data would be "
+                "circular: systematic under-declaration depresses the very median a "
+                "fit would use as its baseline. 1.05 is the conservative end of the "
+                "published CIF/FOB range, so it understates gaps rather than inflating them."
+            ),
+            "vat_rate": VAT_RATE,
+            "bands": {"under_lo": UNDER_LO, "under_hi": UNDER_HI, "over": OVER_RATIO},
+            "signatures": {
+                "under_invoicing": "Value under-declared",
+                "value_gap": "Largely unrecorded",
+                "over_invoicing": "Lebanon declares more",
+                "normal": "Within normal asymmetry",
+                "smuggling_risk": "Goods not presented",
+            },
+            "quantity_available": False,
+            "quantity_note": (
+                "Lebanon publishes no genuine net weight to Comtrade — every non-zero "
+                "weight on its import rows is a UN estimate. Under-pricing therefore "
+                "cannot be separated from missing goods on public data; declaration-level "
+                "weights (NAJM) are what would settle it."
+            ),
+            "duty_note": (
+                "Duty is INDICATIVE, applied as a flat band per HS chapter. It ignores "
+                "excise, exemptions and free-trade preferences. Verify against the "
+                "Lebanese tariff schedule before citing any duty figure."
+            ),
+        },
+        "years": per_year,
+        "corridors": corridors,
+    }
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(json.dumps(payload, indent=1))
+
+    print(f"\n{len(corridors)} corridors across {len(years)} years -> {args.out}")
+    for y in years:
+        v = per_year[str(y)]
+        print(f"\n  {y}:  {v['corridors']} corridors, {len(v['partners'])} partners")
+        print(f"    under-declared  {v['under']['count']:>4} lines  "
+              f"shortfall ${v['under']['shortfall']/1e6:>8,.1f}M  fiscal ${v['under']['fiscal']/1e6:>7,.1f}M")
+        print(f"    unrecorded      {v['unrecorded']['count']:>4} lines  "
+              f"shortfall ${v['unrecorded']['shortfall']/1e6:>8,.1f}M  fiscal ${v['unrecorded']['fiscal']/1e6:>7,.1f}M")
+        print(f"    over-declared   {v['over']['count']:>4} lines  "
+              f"outflow   ${v['over']['outflow']/1e6:>8,.1f}M")
+        print(f"    TOTAL FISCAL    ${v['fiscal_loss']/1e6:,.1f}M  "
+              f"(VAT ${v['vat_floor']/1e6:,.1f}M + duty ${v['duty_loss']/1e6:,.1f}M)")
+    print("\n  LIKE-FOR-LIKE (comparable partners only):")
+    for y in years:
+        v = per_year[str(y)]["comparable"]
+        print(f"    {y}: fiscal ${v['fiscal_loss']/1e6:>7,.1f}M  "
+              f"(under ${v['under']['fiscal']/1e6:>6,.1f}M + unrecorded ${v['unrecorded']['fiscal']/1e6:>6,.1f}M), "
+              f"outflow ${v['over']['outflow']/1e6:>7,.1f}M")
+    print(f"  persistent flagged headings: {sum(1 for c in corridors if c['persistent'])//2}")
+
+
+if __name__ == "__main__" and "--hs6" not in __import__("sys").argv:
+    main()
+
+
+# --------------------------------------------------------------------------- #
+# HS-6 layer — the partner-by-partner mirror the portal serves through its API  #
+# --------------------------------------------------------------------------- #
+
+def _row(code, level, status, m, x_fob, kg, lc, pc, year, partner):
+    x_cif = x_fob * CIF_FACTOR
+    gap = x_cif - m
+    if m > 0 and x_fob == 0:
+        cover, reading = None, "not_in_partner"
+    elif m == 0 and x_fob > 0:
+        cover, reading = 0.0, "not_in_lebanon"
+    else:
+        cover = m / x_cif
+        reading = classify(cover)
+    hs2 = code[:2]
+    return {
+        "y": year, "p": partner, "hs6": code, "lvl": level,
+        "hs4": code[:4], "hs2": hs2, "ch": CHAPTERS.get(hs2, ""),
+        "st": status,
+        "x": round(x_fob, 2), "xc": round(x_cif, 2), "m": round(m, 2),
+        "g": round(gap, 2), "cv": None if cover is None else round(cover, 3),
+        "rd": reading, "vat": round(gap * VAT_RATE, 2) if gap > 0 else 0.0,
+        "duty": round(gap * duty_rate(hs2), 2) if gap > 0 else 0.0,
+        "kg": round(kg, 1) if kg else None,
+        "lv": lc, "pv": pc,
+    }
+
+
+def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int) -> list[dict]:
+    """
+    Every product code on which either side reported the corridor, matched as
+    finely as the two classifications allow.
+
+    Lebanon reports in HS 2017 and its partners in HS 2022, and about 350
+    six-digit codes moved between the two editions. A naive HS-6 join therefore
+    shows hundreds of "one-sided" lines that are really the same goods under a
+    renumbered code. So the match cascades: pair at HS-6 first; whatever is left
+    unpaired on both sides is rolled up and paired at HS-5; whatever is still
+    unpaired is tried at HS-4. Only what survives all three is truly one-sided.
+    Each row carries the level it was matched at.
+    """
+    a = lebanon[(lebanon.flowCode == "M") & (lebanon.partnerCode == code)]
+    a = a.groupby("cmdCode").agg(m=("primaryValue", "sum"), lc=("classificationCode", "first"))
+    b = partner[(partner.flowCode == "X") & (partner.partnerCode == LEBANON)]
+    b = b.groupby("cmdCode").agg(x_fob=("primaryValue", "sum"), kg=("netWgt", "sum"),
+                                 pc=("classificationCode", "first"))
+    j = a.join(b, how="outer").reset_index()
+    j["m"] = j.m.fillna(0.0)
+    j["x_fob"] = j.x_fob.fillna(0.0)
+    j["kg"] = j.kg.fillna(0.0)
+
+    out: list[dict] = []
+    both = j[(j.m > 0) & (j.x_fob > 0)]
+    for r in both.itertuples(index=False):
+        out.append(_row(r.cmdCode, 6, "matched", r.m, r.x_fob, r.kg,
+                        r.lc if isinstance(r.lc, str) else None,
+                        r.pc if isinstance(r.pc, str) else None, year, code))
+
+    # The cascade. `left` holds rows still unpaired after each pass.
+    left = j[~((j.m > 0) & (j.x_fob > 0))].copy()
+    for level in (5, 4):
+        if left.empty:
+            break
+        left["key"] = left.cmdCode.str[:level]
+        leb_side = left[left.m > 0].groupby("key").agg(m=("m", "sum"), lc=("lc", "first"))
+        ptr_side = left[left.x_fob > 0].groupby("key").agg(x_fob=("x_fob", "sum"), kg=("kg", "sum"),
+                                                          pc=("pc", "first"))
+        pairs = leb_side.join(ptr_side, how="inner")
+        for key, r in pairs.iterrows():
+            out.append(_row(key, level, f"matched_hs{level}", r.m, r.x_fob, r.kg,
+                            r.lc if isinstance(r.lc, str) else None,
+                            r.pc if isinstance(r.pc, str) else None, year, code))
+        left = left[~left.key.isin(pairs.index)]
+
+    for r in left.itertuples(index=False):
+        status = "lebanon_only" if r.m > 0 else "partner_only"
+        out.append(_row(r.cmdCode, 6, status, r.m, r.x_fob, r.kg,
+                        r.lc if isinstance(r.lc, str) else None,
+                        r.pc if isinstance(r.pc, str) else None, year, code))
+    return out
+
+
+def build_hs6(dir_: Path, out: Path) -> None:
+    files: dict[int, dict[int, Path]] = defaultdict(dict)
+    for p in sorted(dir_.glob("*.csv")):
+        m = re.match(r".+_(\d+)_(H\d)_(\d{4})\.csv$", p.name)
+        if m:
+            files[int(m.group(3))][int(m.group(1))] = p
+    rows: list[dict] = []
+    for year in sorted(y for y, f in files.items() if LEBANON in f):
+        leb = read_bulk(files[year][LEBANON])
+        for code, path in files[year].items():
+            if code == LEBANON:
+                continue
+            r = hs6_rows(leb, read_bulk(path), code, year)
+            rows.extend(r)
+            n = lambda st: sum(1 for x in r if x["st"] == st)  # noqa: E731
+            print(f"  {year} {COUNTRY.get(code, code):<14} {len(r):>5} lines | "
+                  f"HS-6 {n('matched'):>4} · HS-5 {n('matched_hs5'):>3} · HS-4 {n('matched_hs4'):>3} | "
+                  f"still one-sided: partner {n('partner_only'):>4}, Lebanon {n('lebanon_only'):>4}")
+    out.write_text(json.dumps({
+        "meta": {"cif_factor": CIF_FACTOR, "vat_rate": VAT_RATE, "countries": COUNTRY,
+                 "generated": date.today().isoformat()},
+        "rows": rows,
+    }, separators=(",", ":")))
+    print(f"  {len(rows):,} HS-6 lines -> {out} ({out.stat().st_size/1e6:.1f} MB)")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--hs6" in sys.argv:
+        i = sys.argv.index("--hs6")
+        build_hs6(Path(sys.argv[i + 1]), Path(sys.argv[i + 2]))

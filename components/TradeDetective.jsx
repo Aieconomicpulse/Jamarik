@@ -6,7 +6,7 @@ import { Panel, PanelHead, Eyebrow } from "@/components/ui";
 const STARTERS = [
   "Which products are losing Lebanon the most customs revenue?",
   "Which of these gaps look genuinely suspicious, and which have an innocent explanation?",
-  "Brief me on the China corridor as if for the Minister.",
+  "Which headings gap in both years, and why does that matter?",
   "What is the total VAT at risk — and how solid is that number?",
 ];
 
@@ -44,9 +44,15 @@ function buildContext(data) {
       gap: c.gap,
       gap_pct: c.gap_pct,
       qty_gap_pct: c.qty_gap_pct,
+      year: c.year,
       cover: c.cover,
       signature: c.signature,
+      shortfall: c.shortfall,
       vat_floor: c.vat_floor,
+      duty_loss: c.duty_loss,
+      fiscal_loss: c.fiscal_loss,
+      outflow: c.outflow,
+      persistent: c.persistent,
       confidence: c.confidence,
     })),
   };

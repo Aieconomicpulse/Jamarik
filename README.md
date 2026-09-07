@@ -9,9 +9,12 @@ Three views, all behind a single login:
 
 | Tab | What it does |
 |---|---|
-| **Gap Forensics** | Every partner × HS-4 corridor ranked by absolute gap, classified into fraud signatures (under-invoicing, smuggling/non-declaration, over-invoicing) with a VAT revenue floor per corridor. |
-| **Monthly Monitor** | Partner-reported monthly flows toward Lebanese ports — the only current view, since Lebanon's own submissions lag by a year or more. |
-| **Detective** | A Claude-powered forensic analyst grounded strictly in the loaded mirror dataset. It quantifies, names corridors, and never calls a party fraudulent. |
+| **Overview** | One screen: revenue not collected, split into under-declared / unrecorded / money leaving, the year-on-year trend, top products and partners, and the headings that gap in both years. |
+| **Analytics** | The shape of the problem — how much of what partners shipped Lebanon recorded, by band — then losses by product and partner, and the ten corridors to open first. |
+| **Partner mirror** | Pick a partner and a year: every HS-6 code, the partner's export declaration beside Lebanon's import declaration, gap, cover, reading and VAT forgone. Served by `/api/mirror`. |
+| **Ledger** | Every HS-4 corridor, filterable. The audit surface. |
+| **Detective** | Claude, grounded strictly in the loaded data. |
+| **Method** | Everything the figures rest on, and what changes when this is wired to live data. |
 
 ---
 
@@ -78,7 +81,12 @@ To rotate the password, change `PORTAL_PASSWORD` in Vercel. Changing
 
 ## The data
 
-Two JSON files in `/data`, imported at build time — no database, no runtime fetch.
+Two JSON files in `/data`, built by `pipeline/build_mirror.py` from Comtrade bulk files. `mirror_gaps.json` is the HS-4 corridor set for every year; `mirror_hs6.json` is the HS-6 partner mirror served through `/api/mirror`. Regenerate both with:
+
+```bash
+python pipeline/build_mirror.py --dir <folder of Comtrade CSVs> --out data/mirror_gaps.json
+python pipeline/build_mirror.py --hs6 <folder of Comtrade CSVs> data/mirror_hs6.json
+```
 
 **`mirror_gaps.json`**
 
