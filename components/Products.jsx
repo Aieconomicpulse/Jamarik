@@ -288,10 +288,15 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                 {s.structural.headings.map((h) => (
                   <span key={h.hs4}>
                     HS {h.hs4} {h.ch}: <span className="num text-ink">{money(h.m || h.x)}</span>, {Math.round(h.share * 100)}% of everything{" "}
-                    {h.m > h.x ? `Lebanon registers from ${name}, and absent from ${name}'s export records` : `${name} reports sending, and absent from Lebanon's records`}.{" "}
+                    {h.m > h.x ? `Lebanon registers from ${name}, and absent from ${name}'s own-origin exports` : `${name} reports sending, and absent from Lebanon's records`}.{" "}
+                    {h.m > h.x && h.rx > 0.5 * h.m
+                      ? <>{name} re-exported <span className="num text-ink">{money(h.rx)}</span> of it — goods of another origin passing through, which Lebanon booked as {name}-origin.{" "}</>
+                      : h.m > h.x
+                        ? <>{name} does not report this trade by destination.{" "}</>
+                        : <>Lebanon has no record of it under any origin.{" "}</>}
                   </span>
                 ))}
-                A heading that large on one side only is a reporting-practice question — {name === "Saudi Arabia" ? "Saudi Arabia reports its fuel exports to no destination at all" : "one customs service does not report this trade by destination"} — not a customs gap. It is counted in neither the figures above nor the VAT, and it is listed under &quot;Every product&quot; with a set-aside tag.
+                A heading that large on one side only is a reporting-practice question, not a customs gap. It is counted in neither the figures above nor the VAT, and it is listed under &quot;Every product&quot; with a set-aside tag.
               </div>
             </div>
           )}

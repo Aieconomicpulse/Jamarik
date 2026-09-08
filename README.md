@@ -117,6 +117,12 @@ Three further rules keep the gap honest:
 - **Exempt regimes carry no revenue.** Military equipment (8710, chapter 93)
   and aircraft with parts (8802–8806, 8906) enter under exemptions; those
   lines read `exempt` and have VAT and duty of zero.
+- **One-sided headings are set aside.** A heading that is at least 25% of the
+  side it appears on, with the other side holding under 5% of it, reads
+  `structural` and counts in no total: it is a reporting-practice question
+  (Saudi fuel reported to no destination; UAE diamonds that are re-exports)
+  rather than a customs gap. Both thresholds are constants in the pipeline
+  and in the metadata.
 - **Attribution test.** Every line carries `lw`, Lebanon's imports of the
   HS-4 heading from every origin. When that is below what one partner alone
   says it sent, the goods are absent from Lebanon's books under any origin —

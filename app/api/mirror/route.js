@@ -31,8 +31,8 @@ function summarise(rows) {
     s[r.st] += 1;
     if (r.x > 0 && r.map) s.by_map[r.map] = (s.by_map[r.map] || 0) + 1;
     if (r.rd === "structural") {
-      const h = (s.structural.headings[r.hs4] ||= { hs4: r.hs4, ch: r.ch, x: 0, m: 0, share: r.sx });
-      h.x += r.xc; h.m += r.m; s.structural.lines += 1; s.structural.value += r.xc + r.m;
+      const h = (s.structural.headings[r.hs4] ||= { hs4: r.hs4, ch: r.ch, x: 0, m: 0, rx: 0, share: r.sx });
+      h.x += r.xc; h.m += r.m; h.rx += r.rx || 0; s.structural.lines += 1; s.structural.value += r.xc + r.m;
       continue;
     }
     s.x_fob += r.x; s.x_cif += r.xc; s.m += r.m; s.gap += r.g;

@@ -65,10 +65,11 @@ def is_exempt(code: str) -> bool:
 # the side it appears on, while the other side holds almost none of it, is a
 # reporting-practice question rather than a customs gap: Saudi Arabia books
 # every barrel of fuel to "Areas, not elsewhere specified", so Lebanon's $670M
-# of Saudi fuel has no partner figure at all. Such a heading would dominate
+# of Saudi fuel has no partner figure at all; Lebanon books $155M of diamonds
+# as UAE-origin that the UAE only re-exported. Such a heading would dominate
 # every total for that corridor, so it is set aside from all of them and shown
 # on its own.
-STRUCTURAL_SHARE = 0.30
+STRUCTURAL_SHARE = 0.25
 ONE_SIDED = 0.05
 
 
@@ -237,6 +238,15 @@ def domestic_exports(partner: pd.DataFrame) -> pd.DataFrame:
         d = to_leb[to_leb.flowCode == "DX"].copy()
         d = d.merge(rx, on="cmdCode", how="left") if rx is not None else d.assign(rx=0.0)
         d["rx"] = d.rx.fillna(0.0)
+        if rx is not None:
+            # Codes the partner only re-exports carry no domestic value, but the
+            # re-exported amount is kept so a Lebanon-side line can say where
+            # the goods came through (UAE diamonds, booked in Beirut as UAE).
+            only_rx = rx[~rx.index.isin(d.cmdCode)]
+            if len(only_rx):
+                tmpl = to_leb[to_leb.flowCode == "RX"].drop_duplicates("cmdCode").set_index("cmdCode").loc[only_rx.index].reset_index()
+                tmpl = tmpl.assign(primaryValue=0.0, netWgt=0.0, rx=only_rx.values, flowCode="DX")
+                d = pd.concat([d, tmpl[d.columns]], ignore_index=True)
         return d
     d = to_leb[to_leb.flowCode == "X"].copy()
     if basis == "total_less_reexports":
