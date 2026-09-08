@@ -35,6 +35,8 @@ function summarise(rows) {
     if (r.rd === "under_invoicing") { s.vat_under += r.vat; s.duty_under += r.duty; }
     if (r.rd === "value_gap") s.vat_unrecorded += r.vat;
     if (r.rd === "not_in_lebanon") s.vat_not_in_lebanon += r.vat;
+    if (r.rd === "exempt" && r.g > 0) s.exempt_gap = (s.exempt_gap || 0) + r.g;
+    if (r.rx) s.rx = (s.rx || 0) + r.rx;
     s.by_reading[r.rd] = (s.by_reading[r.rd] || 0) + 1;
   }
   s.cover = s.x_cif ? s.m / s.x_cif : null;
@@ -63,7 +65,7 @@ export async function GET(req) {
         partners: Object.fromEntries(
           Object.entries(avail).map(([y, set]) => [
             y,
-            [...set].sort().map((p) => ({ code: p, name: COUNTRIES[p] ?? String(p) })),
+            [...set].sort().map((p) => ({ code: p, name: COUNTRIES[p] ?? String(p), basis: hs6.meta.basis?.[`${y}:${p}`] ?? null })),
           ])
         ),
         meta: { cif_factor: hs6.meta.cif_factor, vat_rate: hs6.meta.vat_rate, generated: hs6.meta.generated },
@@ -89,6 +91,9 @@ export async function GET(req) {
         ? { code: "all", name: partners.length === 1 ? partners[0].name : `${partners.length} partners` }
         : partners[0],
       partners,
+      // How the partner figure was built: domestic exports, total less re-exports, or total.
+      basis: all ? "mixed" : (hs6.meta.basis?.[`${year}:${partner}`] ?? null),
+      exempt_hs: hs6.meta.exempt_hs ?? [],
       summary: summarise(rows),
       rows,
       served_at: new Date().toISOString(),

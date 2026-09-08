@@ -106,6 +106,23 @@ renumbering), `merged` (several HS 2022 codes pooled into one HS 2017 code),
 `split` (the HS 2022 code could sit under more than one HS 2017 code; the
 table's convention was applied), or `unmapped`. Nothing is paired by prefix.
 
+Three further rules keep the gap honest:
+
+- **Partner figure = domestic exports.** Lebanon books imports by country of
+  origin, so a partner's re-exports never appear under that partner. The
+  pipeline uses DX where the reporter publishes it (UAE, USA, Saudi Arabia),
+  total less RX where only re-exports are published (Italy), and total
+  exports where neither is (China, Greece). Each partner-year records its
+  `basis`; each line keeps `rx`, the re-exported amount, so it can be seen.
+- **Exempt regimes carry no revenue.** Military equipment (8710, chapter 93)
+  and aircraft with parts (8802–8806, 8906) enter under exemptions; those
+  lines read `exempt` and have VAT and duty of zero.
+- **Attribution test.** Every line carries `lw`, Lebanon's imports of the
+  HS-4 heading from every origin. When that is below what one partner alone
+  says it sent, the goods are absent from Lebanon's books under any origin —
+  the strongest evidence this method can give. The corridor file carries the
+  same as `m_world` and a boolean `absent`.
+
 **`mirror_gaps.json`** — `meta` (years, comparable partners, CIF factor, VAT
 rate, bands, caveats), `years[<year>]` (per-year totals, partner list, and a
 like-for-like `comparable` block), and `corridors[]`:
@@ -123,7 +140,7 @@ like-for-like `comparable` block), and `corridors[]`:
 ```
 
 **`mirror_hs6.json`** — `meta` and `rows[]`, one per partner × year × product
-code, compact keys: `y p hs6 hs4 hs2 ch st x xc m g cv rd vat duty kg lv pv pc map`.
+code, compact keys: `y p hs6 hs4 hs2 ch st x xc m g cv rd vat duty kg lv pv pc map rx lw`.
 `st` is whether the line paired (`matched`, `partner_only`, `lebanon_only`);
 `rd` is the reading; `lv`/`pv` are the HS editions each side reported in;
 `pc`/`map` are the partner's original code(s) and how they were placed.

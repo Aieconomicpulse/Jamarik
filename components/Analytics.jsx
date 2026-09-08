@@ -39,7 +39,7 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
 
   const hist = useMemo(
     () => BANDS.map((b) => {
-      const rows = corridors.filter((c) => c.cover >= b.lo && c.cover < b.hi);
+      const rows = corridors.filter((c) => c.signature !== "exempt" && c.cover >= b.lo && c.cover < b.hi);
       return {
         ...b,
         count: rows.length,

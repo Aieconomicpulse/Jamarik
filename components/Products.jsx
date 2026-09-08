@@ -19,11 +19,21 @@ const READING = {
   over_invoicing: { label: "Lebanon declares more", tone: "neutral" },
   normal: { label: "Matches", tone: "cedar" },
   not_in_partner: { label: "Only in Lebanon's books", tone: "neutral" },
+  exempt: { label: "Exempt regime", tone: "neutral" },
+};
+
+// How the partner's figure was built. Lebanon books by origin, so re-exports
+// through the partner are not a gap; only some partners let us remove them.
+const BASIS = {
+  domestic: { label: "domestic exports", title: "The partner publishes domestic exports separately from re-exports; only goods of its own origin are compared — which is how Lebanon books them" },
+  total_less_reexports: { label: "exports less re-exports", title: "The partner publishes re-exports; they are taken off its total, code by code" },
+  total: { label: "total exports · no re-export split published", title: "The partner does not separate re-exports, so goods it merely shipped on may show as a gap" },
+  mixed: { label: "per partner", title: "Each partner uses the best basis it publishes" },
 };
 
 const BAR_TONE = {
   under_invoicing: "burgundy", value_gap: "sea", not_in_lebanon: "sea",
-  over_invoicing: "slate", normal: "cedar", not_in_partner: "slate",
+  over_invoicing: "slate", normal: "cedar", not_in_partner: "slate", exempt: "slate",
 };
 
 // How the partner's HS-2022 code was placed on Lebanon's HS 2017.
@@ -47,14 +57,19 @@ const PAGE = 50;
 function rollup(rows, level, vatRate) {
   const map = new Map();
   for (const r of rows) {
-    const key = level === 2 ? r.hs2 : level === 4 ? r.hs4 : r.hs6;
+    const ex = r.rd === "exempt";
+    // An exempt heading never dissolves into its chapter: it would count as revenue there.
+    const code = ex && level < 6 ? r.hs4 : level === 2 ? r.hs2 : level === 4 ? r.hs4 : r.hs6;
+    const key = ex && level < 6 ? `${r.hs4}·exempt` : code;
     const cur = map.get(key) || {
-      key, code: key, hs2: r.hs2, hs4: r.hs4,
-      name: r.ch || (r.hs2 === "99" ? "Unclassified — confidential or unallocated" : `Chapter ${r.hs2}`),
-      x: 0, xc: 0, m: 0, duty: 0, lines: 0, mapped: 0,
+      key, code, hs2: r.hs2, hs4: r.hs4, exempt: ex,
+      name: (r.ch || (r.hs2 === "99" ? "Unclassified — confidential or unallocated" : `Chapter ${r.hs2}`)) + (ex && level < 6 ? " — exempt regime" : ""),
+      x: 0, xc: 0, m: 0, duty: 0, lines: 0, mapped: 0, rx: 0, lwBy: new Map(),
       partners: new Set(), editions: new Set(), maps: new Set(), pcs: new Set(),
     };
     cur.x += r.x; cur.xc += r.xc; cur.m += r.m; cur.lines += 1;
+    if (r.rx) cur.rx += r.rx;
+    cur.lwBy.set(r.hs4, r.lw ?? 0);
     cur.partners.add(r.p);
     if (r.lv || r.pv) cur.editions.add(`${r.lv ?? "·"}/${r.pv ?? "·"}`);
     if (r.map && r.map !== "same") { cur.mapped += 1; cur.maps.add(r.map); }
@@ -66,7 +81,8 @@ function rollup(rows, level, vatRate) {
   for (const c of map.values()) {
     c.g = c.xc - c.m;
     c.cv = c.xc ? c.m / c.xc : null;
-    c.rd = classifyCover(c.xc, c.m);
+    c.rd = c.exempt ? "exempt" : classifyCover(c.xc, c.m);
+    c.lw = [...c.lwBy.values()].reduce((a, b) => a + b, 0);
     const revenue = REVENUE_READINGS.has(c.rd) && c.g > 0;
     c.vat = revenue ? c.g * vatRate : 0;
     if (!revenue) c.duty = 0;
@@ -172,6 +188,10 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
     return { short, vat };
   }, [byChapter]);
   const chapterBalances = (r) => lvl !== 2 && r.g > 0 && REVENUE_READINGS.has(r.rd) && (byChapter.get(r.hs2)?.g ?? 1) <= 0;
+  // Lebanon books less of this heading from the whole world than this partner
+  // alone says it sent: the goods are not in Lebanon's records under any origin.
+  const absent = (r) => r.g > 0 && REVENUE_READINGS.has(r.rd) && r.lw < 0.85 * r.xc;
+  const basis = BASIS[data?.basis] || null;
 
   const rows = useMemo(() => {
     let r = rolled;
@@ -273,6 +293,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
           <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-[11.5px] text-slate1 mb-6">
             <span><span className="text-ink num">{s.lines.toLocaleString()}</span> product lines</span>
             <span><span className="text-ink num">{s.matched.toLocaleString()}</span> paired on HS 2017</span>
+            {basis && <span title={basis.title}>partner figure: <span className="text-ink">{basis.label}</span>{s.rx > 0 && <span className="text-slate2"> · {money(s.rx)} re-exports set aside</span>}</span>}
             <span title="Partner codes renumbered between HS editions, converted with the official UNSD table"><span className="text-ink num">{(s.by_map?.recoded ?? 0) + (s.by_map?.merged ?? 0)}</span> recoded by the HS table</span>
             <span title="Partner codes that could sit under more than one HS 2017 code"><span className="text-ink num">{s.by_map?.split ?? 0}</span> split</span>
             {(s.by_map?.unmapped ?? 0) > 0 && <span><span className="text-burgundy num">{s.by_map.unmapped}</span> unmapped</span>}
@@ -323,6 +344,12 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                             {lvl < 6 && r.mapped > 0 && (
                               <span className="text-[10px] uppercase tracking-wider num text-slate2 border border-rule rounded px-1" title={`${r.mapped} of ${r.lines} lines were recoded between HS editions with the official table`}>{r.mapped} recoded</span>
                             )}
+                            {r.rd === "exempt" && (
+                              <span className="text-[10px] uppercase tracking-wider num text-slate2 border border-rule rounded px-1" title="Enters under an exemption regime (military, aircraft): no VAT is booked on entry, so this gap is not revenue">exempt regime</span>
+                            )}
+                            {absent(r) && (
+                              <span className="text-[10px] uppercase tracking-wider num text-burgundy border border-burgundy/40 rounded px-1" title={`Lebanon registers ${money(r.lw)} of this heading from every origin combined — less than ${name} alone says it sent. The goods are not in Lebanon's books under any origin.`}>absent from all origins</span>
+                            )}
                             {chapterBalances(r) && (
                               <span className="text-[10px] uppercase tracking-wider num text-cedar border border-cedar/40 rounded px-1" title="This chapter balances overall — the gap here is offset by a neighbouring heading. Read as a coding difference, not revenue.">chapter balances</span>
                             )}
@@ -343,7 +370,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                       isOpen && (
                         <tr key={`${r.key}-detail`} className="[&>td]:bg-bone2/50 [&>td]:shadow-[inset_3px_0_0_#8a6714]">
                           <td colSpan={many ? 7 : 6} className="!pt-3 !pb-5">
-                            <Detail r={r} name={name} rate={rate} cif={avail?.meta?.cif_factor ?? 1.05} level={lvl} chapter={byChapter.get(r.hs2)} balances={chapterBalances(r)} />
+                            <Detail r={r} name={name} rate={rate} cif={avail?.meta?.cif_factor ?? 1.05} level={lvl} chapter={byChapter.get(r.hs2)} balances={chapterBalances(r)} absent={absent(r)} />
                           </td>
                         </tr>
                       ),
@@ -397,7 +424,7 @@ function Th({ k, sort, onSort, right, children }) {
 }
 
 /** The working behind one row, in the order a challenge would come. */
-function Detail({ r, name, rate, cif, level, chapter, balances }) {
+function Detail({ r, name, rate, cif, level, chapter, balances, absent }) {
   const loss = LOSS_BY_KEY[r.rd];
   const editions = [...r.editions];
   const maps = [...r.maps];
@@ -423,6 +450,18 @@ function Detail({ r, name, rate, cif, level, chapter, balances }) {
           <dd className="num text-ink">{money(chapter.xc)} exported · {money(chapter.m)} registered{" "}
             <span className={balances ? "text-cedar" : "text-slate2"}>{balances ? "— balances: this gap is offset within the chapter, read as a coding difference" : chapter.g > 0 ? "— the chapter as a whole is also short" : ""}</span></dd></>
         )}
+        {r.rx > 0 && (
+          <><dt className="eyebrow text-[10px] pt-0.5">Re-exported via {name}</dt>
+          <dd className="num text-ink">{money(r.rx)} <span className="text-slate2">— goods of another origin shipped on; Lebanon books them under that origin, so they are set aside</span></dd></>
+        )}
+        {r.xc > 0 && (
+          <><dt className="eyebrow text-[10px] pt-0.5">All origins{level === 6 ? `, heading ${r.hs4}` : ""}</dt>
+          <dd className="num text-ink">{money(r.lw)} registered from every origin{" "}
+            <span className={absent ? "text-burgundy" : "text-slate2"}>
+              {absent ? `— less than ${name} alone says it sent: not in Lebanon's books under any origin`
+                : r.g > 0 && REVENUE_READINGS.has(r.rd) ? "— Lebanon does book this much from other origins; the gap may be attribution" : ""}
+            </span></dd></>
+        )}
       </dl>
       <div className="text-ink2 space-y-2">
         {loss ? (
@@ -430,6 +469,8 @@ function Detail({ r, name, rate, cif, level, chapter, balances }) {
             <p><span className="text-ink">{loss.label}.</span> {loss.what}</p>
             <p className="text-slate1"><span className="text-ink2">What to do:</span> {loss.remedy}</p>
           </>
+        ) : r.rd === "exempt" ? (
+          <p className="text-[13px] text-ink2 leading-relaxed"><span className="text-ink">Exempt regime.</span> Military equipment and aircraft enter under exemptions: {name} reports the export, Lebanese customs books no VAT on the entry. The gap is shown for completeness and carries no revenue.</p>
         ) : r.rd === "not_in_lebanon" ? (
           <p><span className="text-ink">Not registered.</span> {name} reports exporting this and Lebanon has no import line for it at any level of the code. Check transit, re-export and the origin recorded at the port before treating it as revenue.</p>
         ) : r.rd === "not_in_partner" ? (

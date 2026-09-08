@@ -49,6 +49,17 @@ CIF_FACTOR = 1.05          # documented constant — see note in meta
 MIN_PARTNER_VALUE = 250_000
 EXCLUDED_HS4 = {"9999", "9880"}
 
+# Goods that enter under an exemption regime rather than as a commercial import:
+# military equipment (US FMF deliveries to the armed forces) and aircraft with
+# their parts (international-transport exemptions). The partner reports the
+# export; Lebanese customs books no VAT on the entry. A gap here is real but
+# it is not revenue, so it is read as "exempt" and carries no VAT or duty.
+EXEMPT_HS = ("8710", "8802", "8803", "8805", "8806", "8906", "93")
+
+
+def is_exempt(code: str) -> bool:
+    return code.startswith(EXEMPT_HS)
+
 UNDER_LO, UNDER_HI = 0.40, 0.85
 OVER_RATIO = 1.60
 
@@ -120,6 +131,9 @@ COUNTRY = {
 
 HS_TABLE = Path(__file__).resolve().parent / "hs" / "HS2022toHS2017.xlsx"
 
+# "year:partner" -> export basis, filled in main() and written into the HS-6 meta.
+EXPORT_BASIS: dict[str, str] = {}
+
 # Mapping kinds, worst first. A merged HS-2017 line inherits the worst kind of
 # the HS-2022 codes that fed it.
 MAP_RANK = {"unmapped": 0, "split": 1, "merged": 2, "recoded": 3, "same": 4}
@@ -176,6 +190,59 @@ def to_hs2017(partner: pd.DataFrame, hs: Concordance) -> pd.DataFrame:
     out["h17"] = conv.map(lambda x: x[0])
     out["map"] = conv.map(lambda x: x[1])
     return out
+
+
+def export_basis(partner: pd.DataFrame) -> str:
+    flows = set(partner.flowCode.unique())
+    return "domestic" if "DX" in flows else ("total_less_reexports" if "RX" in flows else "total")
+
+
+def domestic_exports(partner: pd.DataFrame) -> pd.DataFrame:
+    """
+    The partner's exports to Lebanon on the basis Lebanon books them.
+
+    Lebanon records an import under its country of origin. A partner's
+    re-exports — goods made elsewhere and shipped on — never appear under
+    that partner in Beirut, so comparing them to Lebanon's figure manufactures
+    a gap (the UAE's 2023 "exports" to Lebanon were 73% re-exports). Where the
+    partner publishes domestic exports (DX) they are used; where it publishes
+    only re-exports (RX) they come off the total, code by code; where it
+    publishes neither (China, Greece) the total stands and the basis says so.
+    The re-exported amount is kept on each code so a reader can see it.
+    """
+    to_leb = partner[partner.partnerCode == LEBANON]
+    basis = export_basis(partner)
+    rx = (to_leb[to_leb.flowCode == "RX"].groupby("cmdCode").primaryValue.sum().rename("rx")
+          if basis != "total" else None)
+    if basis == "domestic":
+        d = to_leb[to_leb.flowCode == "DX"].copy()
+        d = d.merge(rx, on="cmdCode", how="left") if rx is not None else d.assign(rx=0.0)
+        d["rx"] = d.rx.fillna(0.0)
+        return d
+    d = to_leb[to_leb.flowCode == "X"].copy()
+    if basis == "total_less_reexports":
+        d = d.merge(rx, on="cmdCode", how="left")
+        d["rx"] = d.rx.fillna(0.0)
+        d["primaryValue"] = (d.primaryValue - d.rx).clip(lower=0.0)
+    else:
+        d["rx"] = float("nan")
+    return d
+
+
+def read_lebanon(path: Path) -> tuple[pd.DataFrame, pd.Series]:
+    """
+    Lebanon's detail rows, plus its imports of every HS-4 heading from every
+    origin. The second is the attribution test: when Lebanon books less of a
+    heading from the whole world than one partner says it sent, the goods are
+    absent from Lebanon's records under any origin — not merely credited to a
+    different one. That is the strongest evidence this method can give.
+    """
+    raw = pd.read_csv(path, sep="\t", dtype={"cmdCode": str}, low_memory=False)
+    base = (raw.partner2Code == 0) & (raw.motCode == 0) & (raw.customsCode == "C00")
+    detail = raw[base & (raw.cmdCode.str.len() == 6) & (raw.partnerCode != 0)].copy()
+    world4 = (raw[base & (raw.flowCode == "M") & (raw.partnerCode == 0) & (raw.cmdCode.str.len() == 4)]
+              .groupby("cmdCode").primaryValue.sum())
+    return detail, world4
 
 
 def read_bulk(path: Path) -> pd.DataFrame:
@@ -244,9 +311,9 @@ def classify(cover: float) -> str:
 
 
 def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
-                  code: int, year: int, hs: Concordance) -> list[dict]:
+                  code: int, year: int, hs: Concordance, world4: pd.Series) -> list[dict]:
     leb = lebanon[(lebanon.flowCode == "M") & (lebanon.partnerCode == code)].copy()
-    ptr = partner[(partner.flowCode == "X") & (partner.partnerCode == LEBANON)].copy()
+    ptr = domestic_exports(partner)
     if leb.empty or ptr.empty:
         return []
 
@@ -255,7 +322,7 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
     leb["hs4"] = leb.cmdCode.str[:4]
     ptr["hs4"] = ptr.h17.str[:4]
     a = leb.groupby("hs4").primaryValue.sum().rename("m")
-    b = ptr.groupby("hs4").agg(x_fob=("primaryValue", "sum"), x_kg=("netWgt", "sum"))
+    b = ptr.groupby("hs4").agg(x_fob=("primaryValue", "sum"), x_kg=("netWgt", "sum"), rx=("rx", "sum"))
     frame = pd.concat([a, b], axis=1).fillna(0.0).reset_index()
     frame = frame[(frame.x_fob >= MIN_PARTNER_VALUE) & (~frame.hs4.isin(EXCLUDED_HS4))]
 
@@ -264,9 +331,10 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
         x_cif = r.x_fob * CIF_FACTOR
         gap = x_cif - r.m                       # positive = Lebanon declared less
         cover = r.m / x_cif if x_cif else 0.0
-        sig = classify(cover)
+        sig = "exempt" if is_exempt(r.hs4) else classify(cover)
         hs2 = r.hs4[:2]
         rate = duty_rate(hs2)
+        m_world = float(world4.get(r.hs4, 0.0))
 
         # Fiscal loss only where Lebanon declared LESS. Over-declaration is not a
         # revenue loss — it is money leaving, counted separately.
@@ -291,6 +359,9 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
             "cover": round(cover, 3),
             "qty_gap_pct": None,                # Lebanon publishes no genuine weights
             "partner_kg": round(r.x_kg, 1) if r.x_kg else None,
+            "rx": round(r.rx, 2) if r.rx == r.rx else None,   # re-exports through the partner, FOB
+            "m_world": round(m_world, 2),                     # Lebanon's imports of the heading from every origin
+            "absent": bool(x_cif > 0 and m_world < 0.85 * x_cif),
             "signature": sig,
             "shortfall": round(shortfall, 2),
             "outflow": round(outflow, 2),
@@ -325,6 +396,7 @@ def summarise(rows: list[dict]) -> dict:
                        "fiscal": s("fiscal_loss", is_gap)},
         "over": {"count": counts["over_invoicing"], "outflow": s("outflow", is_over)},
         "normal": {"count": counts["normal"]},
+        "exempt": {"count": counts["exempt"], "gap": s("gap", lambda c: c["signature"] == "exempt" and c["gap"] > 0)},
         "vat_floor": s("vat_floor"),
         "duty_loss": s("duty_loss"),
         "fiscal_loss": s("fiscal_loss"),
@@ -356,20 +428,23 @@ def main() -> None:
     hs6: list[dict] = []
 
     for year in years:
-        leb = read_bulk(files[year][LEBANON])
+        leb, world4 = read_lebanon(files[year][LEBANON])
         rows_this_year: list[dict] = []
         got = []
+        basis_of: dict[int, str] = {}
         for code, path in sorted(files[year].items()):
             if code == LEBANON:
                 continue
             ptr = read_bulk(path)
-            rows = corridors_for(leb, ptr, code, year, hs)
+            basis_of[code] = export_basis(ptr)
+            rows = corridors_for(leb, ptr, code, year, hs, world4)
             if rows:
                 rows_this_year.extend(rows)
                 got.append(code)
-                print(f"  {year} {COUNTRY.get(code, code):<15} {len(rows):>4} corridors")
+                print(f"  {year} {COUNTRY.get(code, code):<15} {len(rows):>4} corridors · partner figure: {basis_of[code]}")
             if args.hs6_out:
-                r = hs6_rows(leb, ptr, code, year, hs)
+                r = hs6_rows(leb, ptr, code, year, hs, world4)
+                EXPORT_BASIS[f"{year}:{code}"] = basis_of[code]
                 hs6.extend(r)
                 n = lambda st: sum(1 for x in r if x["st"] == st)  # noqa: E731
                 m = lambda k: sum(1 for x in r if x.get("map") == k)  # noqa: E731
@@ -380,7 +455,7 @@ def main() -> None:
         corridors.extend(rows_this_year)
         per_year[str(year)] = summarise(rows_this_year)
         per_year[str(year)]["partners"] = [
-            {"code": c, "name": COUNTRY.get(c, str(c)), "hub": c in HUBS} for c in got
+            {"code": c, "name": COUNTRY.get(c, str(c)), "hub": c in HUBS, "basis": basis_of[c]} for c in got
         ]
 
     # Partners present in every year — the only set where a year-on-year
@@ -441,7 +516,15 @@ def main() -> None:
                 "over_invoicing": "Lebanon declares more",
                 "normal": "Within normal asymmetry",
                 "smuggling_risk": "Goods not presented",
+                "exempt": "Exempt regime · military & aircraft",
             },
+            "partner_basis": (
+                "Lebanon books imports by country of origin, so a partner's re-exports never "
+                "appear under that partner. The partner figure is domestic exports (DX) where "
+                "published; total exports less re-exports where only RX is published; total "
+                "exports where neither is (China, Greece). Each partner-year says which."
+            ),
+            "exempt_hs": list(EXEMPT_HS),
             "classification": (
                 "Lebanon reports in HS 2017 (H5); every partner in HS 2022 (H6). Partner codes "
                 "are converted to HS 2017 with the UNSD HS2022-to-HS2017 conversion table before "
@@ -497,7 +580,7 @@ def main() -> None:
 # HS-6 layer — the partner-by-partner mirror the portal serves through its API  #
 # --------------------------------------------------------------------------- #
 
-def _row(code, status, m, x_fob, kg, lc, pc, year, partner, src, kind):
+def _row(code, status, m, x_fob, kg, lc, pc, year, partner, src, kind, rx, lw):
     x_cif = x_fob * CIF_FACTOR
     gap = x_cif - m
     if m > 0 and x_fob == 0:
@@ -507,6 +590,8 @@ def _row(code, status, m, x_fob, kg, lc, pc, year, partner, src, kind):
     else:
         cover = m / x_cif
         reading = classify(cover)
+    if is_exempt(code):
+        reading = "exempt"
     hs2 = code[:2]
     return {
         "y": year, "p": partner, "hs6": code,
@@ -514,17 +599,22 @@ def _row(code, status, m, x_fob, kg, lc, pc, year, partner, src, kind):
         "st": status,
         "x": round(x_fob, 2), "xc": round(x_cif, 2), "m": round(m, 2),
         "g": round(gap, 2), "cv": None if cover is None else round(cover, 3),
-        "rd": reading, "vat": round(gap * VAT_RATE, 2) if gap > 0 else 0.0,
-        "duty": round(gap * duty_rate(hs2), 2) if gap > 0 else 0.0,
+        "rd": reading,
+        "vat": round(gap * VAT_RATE, 2) if gap > 0 and reading != "exempt" else 0.0,
+        "duty": round(gap * duty_rate(hs2), 2) if gap > 0 and reading != "exempt" else 0.0,
         "kg": round(kg, 1) if kg else None,
         "lv": lc, "pv": pc,
         # What the partner actually reported (HS 2022) and how it was placed.
         "pc": src, "map": kind,
+        # Re-exports through the partner on this code (FOB), and Lebanon's imports
+        # of the whole HS-4 heading from every origin — the attribution test.
+        "rx": round(rx, 2) if rx == rx else None,
+        "lw": round(lw, 2),
     }
 
 
 def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int,
-             hs: Concordance) -> list[dict]:
+             hs: Concordance, world4: pd.Series) -> list[dict]:
     """
     Every product code on which either side reported the corridor, paired on
     HS 2017.
@@ -538,10 +628,9 @@ def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int,
     """
     a = lebanon[(lebanon.flowCode == "M") & (lebanon.partnerCode == code)]
     a = a.groupby("cmdCode").agg(m=("primaryValue", "sum"), lc=("classificationCode", "first"))
-    b = partner[(partner.flowCode == "X") & (partner.partnerCode == LEBANON)]
-    b = to_hs2017(b, hs)
+    b = to_hs2017(domestic_exports(partner), hs)
     b = b.groupby("h17").agg(
-        x_fob=("primaryValue", "sum"), kg=("netWgt", "sum"),
+        x_fob=("primaryValue", "sum"), kg=("netWgt", "sum"), rx=("rx", "sum"),
         pc=("classificationCode", "first"),
         src=("cmdCode", lambda v: "+".join(sorted(set(v)))),
         kind=("map", lambda v: min(v, key=lambda k: MAP_RANK[k])),
@@ -554,6 +643,10 @@ def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int,
     j["m"] = j.m.fillna(0.0)
     j["x_fob"] = j.x_fob.fillna(0.0)
     j["kg"] = j.kg.fillna(0.0)
+    # A code the partner only re-exported and Lebanon never registered has
+    # nothing on either side once re-exports come off; it is not a line.
+    j = j[(j.m > 0) | (j.x_fob > 0)]
+    has_rx = export_basis(partner) != "total"
 
     out: list[dict] = []
     for r in j.itertuples(index=False):
@@ -565,6 +658,8 @@ def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int,
             year, code,
             r.src if isinstance(r.src, str) else None,
             r.kind if isinstance(r.kind, str) else None,
+            (r.rx if r.rx == r.rx else 0.0) if has_rx else float("nan"),
+            float(world4.get(r.cmdCode[:4], 0.0)),
         ))
     return out
 
@@ -572,7 +667,8 @@ def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int,
 def write_hs6(rows: list[dict], out: Path) -> None:
     out.write_text(json.dumps({
         "meta": {"cif_factor": CIF_FACTOR, "vat_rate": VAT_RATE, "countries": COUNTRY,
-                 "generated": date.today().isoformat()},
+                 "generated": date.today().isoformat(),
+                 "basis": dict(EXPORT_BASIS), "exempt_hs": list(EXEMPT_HS)},
         "rows": rows,
     }, separators=(",", ":")))
     print(f"  {len(rows):,} HS-6 lines -> {out} ({out.stat().st_size/1e6:.1f} MB)")

@@ -59,6 +59,9 @@ export default function Method({ meta, stamp }) {
           <Row k="Quantities">{meta.quantity_note}</Row>
           <Row k="Coverage">{meta.coverage}. Corridors below $250,000 and confidentiality buckets are excluded. Year-on-year comparisons use only partners present in every year.</Row>
           <Row k="Classification">{meta.classification ?? "Lebanon reports in HS 2017; partners in HS 2022. Partner codes are converted to HS 2017 with the official UNSD table before pairing."} Where a chapter balances but its headings gap in opposite directions, the two customs services are coding the same goods differently — the Products screen tags those lines rather than counting them as revenue.</Row>
+          <Row k="Partner figure">{meta.partner_basis ?? "Domestic exports where the partner publishes them; total exports less re-exports where only re-exports are published; total exports otherwise."} Re-exports never appear under the shipping partner in Lebanon&apos;s books, so they are not a gap.</Row>
+          <Row k="Exempt regimes">Military equipment (HS 8710, chapter 93) and aircraft with their parts (8802–8806, 8906) enter under exemption regimes: the partner reports the export, Lebanese customs books no VAT on the entry. Those lines are shown, read as &quot;exempt&quot;, and carry no revenue.</Row>
+          <Row k="Attribution test">Every heading also carries Lebanon&apos;s imports of it from every origin. Where that is below what one partner alone says it sent, the goods are absent from Lebanon&apos;s books under any origin — tagged &quot;absent from all origins&quot;, the strongest signal this method gives. Where Lebanon books at least as much from other origins, the gap may be origin attribution and is read with more caution.</Row>
           <Row k="Standing">Per the WCO, mirror gaps show where to investigate. They are risk indicators, not findings, and name no party as fraudulent.</Row>
         </dl>
       </Panel>
