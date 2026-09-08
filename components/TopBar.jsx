@@ -17,7 +17,7 @@ export default function TopBar({ user, generated }) {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-rule bg-bone/85 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-rule bg-bone shadow-sm">
       <div className="max-w-[1400px] mx-auto px-5 lg:px-10 h-14 flex items-center justify-between gap-4">
         <Wordmark small />
         <div className="flex items-center gap-5">

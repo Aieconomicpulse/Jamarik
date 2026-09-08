@@ -95,7 +95,6 @@ export default function GapForensics({ data, onOpenProducts }) {
                 <th className="text-right">Lebanon</th>
                 <th className="text-right">Gap</th>
                 <th className="text-right">Gap %</th>
-                <th className="text-right">Qty gap %</th>
                 <th>Signature</th>
                 <th className="text-right">VAT floor</th>
               </tr>
@@ -116,7 +115,6 @@ export default function GapForensics({ data, onOpenProducts }) {
                     {money(c.gap)}
                   </td>
                   <td className="text-right num">{pct(c.gap_pct)}</td>
-                  <td className="text-right num">{pct(c.qty_gap_pct)}</td>
                   <td>
                     <Chip tone={SIG_TONE[c.signature]}>
                       {meta.signatures[c.signature] ?? c.signature}
@@ -127,7 +125,7 @@ export default function GapForensics({ data, onOpenProducts }) {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-slate1">
+                  <td colSpan={8} className="text-slate1">
                     No corridors match this filter.
                   </td>
                 </tr>
