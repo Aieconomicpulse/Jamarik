@@ -229,7 +229,7 @@ def domestic_exports(partner: pd.DataFrame) -> pd.DataFrame:
     return d
 
 
-def read_lebanon(path: Path) -> tuple[pd.DataFrame, pd.Series]:
+def read_lebanon(path: Path) -> tuple[pd.DataFrame, pd.Series, dict]:
     """
     Lebanon's detail rows, plus its imports of every HS-4 heading from every
     origin. The second is the attribution test: when Lebanon books less of a
@@ -242,10 +242,47 @@ def read_lebanon(path: Path) -> tuple[pd.DataFrame, pd.Series]:
     detail = raw[base & (raw.cmdCode.str.len() == 6) & (raw.partnerCode != 0)].copy()
     world4 = (raw[base & (raw.flowCode == "M") & (raw.partnerCode == 0) & (raw.cmdCode.str.len() == 4)]
               .groupby("cmdCode").primaryValue.sum())
-    return detail, world4
+    return detail, world4, _checks(raw, base)
 
 
-def read_bulk(path: Path) -> pd.DataFrame:
+def _checks(raw: pd.DataFrame, base: pd.Series) -> dict:
+    """The file's own TOTAL rows and its world HS-6 sums — what the build reconciles to."""
+    six = raw.cmdCode.str.len() == 6
+    return {
+        "totals": raw.loc[base & (raw.cmdCode == "TOTAL"), ["flowCode", "partnerCode", "primaryValue"]],
+        "world6": raw.loc[base & six & (raw.partnerCode == 0)].groupby("flowCode").primaryValue.sum().to_dict(),
+    }
+
+
+def reconcile(checks: dict, detail: pd.DataFrame, flow: str, partner: int,
+              year: int, reporter: str, partner_name: str) -> dict:
+    """One line of the reconciliation table: our HS-6 sum against the file's TOTAL row."""
+    t = checks["totals"]
+    t = t[(t.flowCode == flow) & (t.partnerCode == partner)].primaryValue
+    total = float(t.iloc[0]) if len(t) else None
+    if partner == 0:
+        s, n = float(checks["world6"].get(flow, 0.0)), None
+    else:
+        sel = detail[(detail.flowCode == flow) & (detail.partnerCode == partner)]
+        s, n = float(sel.primaryValue.sum()), int(len(sel))
+    return {"year": year, "reporter": reporter, "flow": flow, "partner": partner_name, "lines": n,
+            "hs6_sum": round(s, 2), "total_row": None if total is None else round(total, 2),
+            "ratio": None if not total else round(s / total, 4)}
+
+
+# Published figures the build is checked against, in USD. A build that drifts
+# from these is reading the wrong file, not finding a bigger gap.
+EXTERNAL_CHECKS = [
+    {"figure": "Lebanon total imports", "year": 2024, "reporter": LEBANON, "flow": "M", "partner": 0,
+     "published": 17.3e9, "source": "Lebanese Customs, cited in the US Country Commercial Guide (trade.gov)"},
+    {"figure": "Lebanon imports from the United States", "year": 2024, "reporter": LEBANON, "flow": "M", "partner": 842,
+     "published": 584e6, "source": "Lebanese Customs, cited in the US Country Commercial Guide (trade.gov)"},
+    {"figure": "China exports to Lebanon", "year": 2024, "reporter": 156, "flow": "X", "partner": LEBANON,
+     "published": 2.11e9, "source": "UN Comtrade, as published by Trading Economics"},
+]
+
+
+def read_bulk(path: Path) -> tuple[pd.DataFrame, dict]:
     """
     One reporter-year, reduced to genuine non-overlapping detail rows.
 
@@ -257,14 +294,9 @@ def read_bulk(path: Path) -> pd.DataFrame:
     # pandas infers gzip/zip from the extension, so a raw bulk download reads
     # the same as one that was unpacked by hand.
     df = pd.read_csv(path, sep="\t", dtype={"cmdCode": str}, low_memory=False)
-    keep = (
-        (df["cmdCode"].str.len() == 6)
-        & (df["partnerCode"] != 0)
-        & (df["partner2Code"] == 0)
-        & (df["motCode"] == 0)
-        & (df["customsCode"] == "C00")
-    )
-    return df.loc[keep].copy()
+    base = (df["partner2Code"] == 0) & (df["motCode"] == 0) & (df["customsCode"] == "C00")
+    keep = base & (df["cmdCode"].str.len() == 6) & (df["partnerCode"] != 0)
+    return df.loc[keep].copy(), _checks(df, base)
 
 
 # Two naming schemes turn up in a download folder: Comtrade's own
@@ -426,16 +458,24 @@ def main() -> None:
     per_year: dict[str, dict] = {}
     partners_by_year: dict[int, list[int]] = {}
     hs6: list[dict] = []
+    recon: list[dict] = []
+    totals_by: dict[tuple, pd.DataFrame] = {}
 
     for year in years:
-        leb, world4 = read_lebanon(files[year][LEBANON])
+        leb, world4, lchecks = read_lebanon(files[year][LEBANON])
+        totals_by[(year, LEBANON)] = lchecks["totals"]
+        recon.append(reconcile(lchecks, leb, "M", 0, year, "Lebanon", "World"))
         rows_this_year: list[dict] = []
         got = []
         basis_of: dict[int, str] = {}
         for code, path in sorted(files[year].items()):
             if code == LEBANON:
                 continue
-            ptr = read_bulk(path)
+            ptr, pchecks = read_bulk(path)
+            totals_by[(year, code)] = pchecks["totals"]
+            recon.append(reconcile(lchecks, leb, "M", code, year, "Lebanon", COUNTRY.get(code, str(code))))
+            recon.append(reconcile(pchecks, ptr, "X", LEBANON, year, COUNTRY.get(code, str(code)), "Lebanon"))
+            recon.append(reconcile(pchecks, ptr, "X", 0, year, COUNTRY.get(code, str(code)), "World"))
             basis_of[code] = export_basis(ptr)
             rows = corridors_for(leb, ptr, code, year, hs, world4)
             if rows:
@@ -489,6 +529,44 @@ def main() -> None:
 
     corridors.sort(key=lambda c: (-c["year"], -abs(c["gap"])))
 
+    # The build checks itself and publishes the checks. Three tables: our HS-6
+    # sums against every file's own TOTAL row; a few figures against what the
+    # customs services published; and each partner-year's basis and mirror ratio.
+    external = []
+    for chk in EXTERNAL_CHECKS:
+        t = totals_by.get((chk["year"], chk["reporter"]))
+        if t is None:
+            continue
+        v = t[(t.flowCode == chk["flow"]) & (t.partnerCode == chk["partner"])].primaryValue
+        if len(v):
+            ours = float(v.iloc[0])
+            external.append({**{k: chk[k] for k in ("figure", "year", "published", "source")},
+                             "ours": round(ours, 2), "diff_pct": round(100 * (ours - chk["published"]) / chk["published"], 2)})
+    pv = []
+    for year in years:
+        for code in partners_by_year[year]:
+            lines = [r for r in hs6 if r["y"] == year and r["p"] == code]
+            cs = [c for c in corridors if c["year"] == year and c["partner"] == code]
+            x = sum(r["xc"] for r in lines); m = sum(r["m"] for r in lines)
+            fiscal = sum(c["fiscal_loss"] for c in cs if c["signature"] in ("under_invoicing", "value_gap") and c["gap"] > 0)
+            absent = sum(c["fiscal_loss"] for c in cs if c["signature"] in ("under_invoicing", "value_gap") and c["gap"] > 0 and c["absent"])
+            pv.append({
+                "year": year, "code": code, "name": COUNTRY.get(code, str(code)),
+                "basis": EXPORT_BASIS.get(f"{year}:{code}"),
+                "lines": len(lines), "x_cif": round(x, 2), "m": round(m, 2), "ratio": round(m / x, 3) if x else None,
+                "rx": round(sum(r["rx"] or 0 for r in lines), 2),
+                "exempt_gap": round(sum(r["g"] for r in lines if r["rd"] == "exempt" and r["g"] > 0), 2),
+                "fiscal": round(fiscal, 2), "fiscal_absent": round(absent, 2),
+            })
+    validation = {
+        "reconciliation": recon, "external": external, "partners": pv,
+        "note": ("Every figure here is produced by the build itself. The reconciliation sums the HS-6 "
+                 "rows the build uses and sets them against the TOTAL row Comtrade publishes in the same "
+                 "file; a ratio other than 1.0000 would mean rows were double-counted or dropped. Mirror "
+                 "ratios between 0.8 and 1.2 are ordinary for two customs services; outside that range "
+                 "the basis column says why."),
+    }
+
     payload = {
         "meta": {
             "demo": False,
@@ -525,6 +603,7 @@ def main() -> None:
                 "exports where neither is (China, Greece). Each partner-year says which."
             ),
             "exempt_hs": list(EXEMPT_HS),
+            "validation": validation,
             "classification": (
                 "Lebanon reports in HS 2017 (H5); every partner in HS 2022 (H6). Partner codes "
                 "are converted to HS 2017 with the UNSD HS2022-to-HS2017 conversion table before "

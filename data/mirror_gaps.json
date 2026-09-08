@@ -25,7 +25,7 @@
    }
   ],
   "generated": "2026-09-08",
-  "retrieved": "2026-09-08T08:55:22.681385+00:00",
+  "retrieved": "2026-09-08T09:12:33.226989+00:00",
   "source": "UN Comtrade bulk FINAL files (comtradeapi.un.org)",
   "coverage": "PARTIAL \u2014 only the partners listed per year are mirrored",
   "cif_factor": 1.05,
@@ -54,6 +54,499 @@
    "8906",
    "93"
   ],
+  "validation": {
+   "reconciliation": [
+    {
+     "year": 2023,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 18122412183.0,
+     "total_row": 18122412183.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "China",
+     "lines": 3038,
+     "hs6_sum": 2087967163.0,
+     "total_row": 2087967163.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "China",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 2819,
+     "hs6_sum": 2372331830.0,
+     "total_row": 2372331830.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "China",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 3379747834884.0,
+     "total_row": 3379747834884.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "Greece",
+     "lines": 653,
+     "hs6_sum": 1778322111.0,
+     "total_row": 1778322111.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Greece",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 540,
+     "hs6_sum": 1541132070.01,
+     "total_row": 1541132070.02,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Greece",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 55051586783.72,
+     "total_row": 55051586783.71,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "Italy",
+     "lines": 2408,
+     "hs6_sum": 1120337614.0,
+     "total_row": 1120337614.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Italy",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 2249,
+     "hs6_sum": 1194847155.11,
+     "total_row": 1194847155.12,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Italy",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 676819818431.72,
+     "total_row": 676819818431.7,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "UAE",
+     "lines": 703,
+     "hs6_sum": 535954117.0,
+     "total_row": 535954117.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "UAE",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 2044,
+     "hs6_sum": 1709057410.29,
+     "total_row": 1709057410.32,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "UAE",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 570245383584.54,
+     "total_row": 570245383584.53,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "United States",
+     "lines": 1967,
+     "hs6_sum": 735443728.0,
+     "total_row": 735443728.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "United States",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 1162,
+     "hs6_sum": 541749459.0,
+     "total_row": 541749459.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2023,
+     "reporter": "United States",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 2018542583771.0,
+     "total_row": 2018542583771.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 17307468757.0,
+     "total_row": 17307468757.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "China",
+     "lines": 3048,
+     "hs6_sum": 1979350971.0,
+     "total_row": 1979350971.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "China",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 2815,
+     "hs6_sum": 2111362748.0,
+     "total_row": 2111362748.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "China",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 3576543293842.0,
+     "total_row": 3576543293842.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "Greece",
+     "lines": 582,
+     "hs6_sum": 1564787282.0,
+     "total_row": 1564787282.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Greece",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 540,
+     "hs6_sum": 1320567614.68,
+     "total_row": 1320567614.67,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Greece",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 53357148958.61,
+     "total_row": 53357148958.6,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "Italy",
+     "lines": 2385,
+     "hs6_sum": 902799585.0,
+     "total_row": 902799585.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Italy",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 2161,
+     "hs6_sum": 914627381.38,
+     "total_row": 914627381.37,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Italy",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 673897621703.21,
+     "total_row": 673897621703.22,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "Saudi Arabia",
+     "lines": 355,
+     "hs6_sum": 887909173.0,
+     "total_row": 887909173.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Saudi Arabia",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 334,
+     "hs6_sum": 205380185.26,
+     "total_row": 205380185.26,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Saudi Arabia",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 305499387356.93,
+     "total_row": 305499387356.91,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "Lebanon",
+     "flow": "M",
+     "partner": "United States",
+     "lines": 1885,
+     "hs6_sum": 583787885.0,
+     "total_row": 583787885.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "United States",
+     "flow": "X",
+     "partner": "Lebanon",
+     "lines": 1080,
+     "hs6_sum": 541421719.0,
+     "total_row": 541421719.0,
+     "ratio": 1.0
+    },
+    {
+     "year": 2024,
+     "reporter": "United States",
+     "flow": "X",
+     "partner": "World",
+     "lines": null,
+     "hs6_sum": 2063802611123.0,
+     "total_row": 2063802611123.0,
+     "ratio": 1.0
+    }
+   ],
+   "external": [
+    {
+     "figure": "Lebanon total imports",
+     "year": 2024,
+     "published": 17300000000.0,
+     "source": "Lebanese Customs, cited in the US Country Commercial Guide (trade.gov)",
+     "ours": 17307468757.0,
+     "diff_pct": 0.04
+    },
+    {
+     "figure": "Lebanon imports from the United States",
+     "year": 2024,
+     "published": 584000000.0,
+     "source": "Lebanese Customs, cited in the US Country Commercial Guide (trade.gov)",
+     "ours": 583787885.0,
+     "diff_pct": -0.04
+    },
+    {
+     "figure": "China exports to Lebanon",
+     "year": 2024,
+     "published": 2110000000.0,
+     "source": "UN Comtrade, as published by Trading Economics",
+     "ours": 2111362748.0,
+     "diff_pct": 0.06
+    }
+   ],
+   "partners": [
+    {
+     "year": 2023,
+     "code": 156,
+     "name": "China",
+     "basis": "total",
+     "lines": 3302,
+     "x_cif": 2490948421.5,
+     "m": 2087967163.0,
+     "ratio": 0.838,
+     "rx": 0,
+     "exempt_gap": 8.5,
+     "fiscal": 156103178.35,
+     "fiscal_absent": 65498840.95
+    },
+    {
+     "year": 2023,
+     "code": 300,
+     "name": "Greece",
+     "basis": "total",
+     "lines": 844,
+     "x_cif": 1618188673.51,
+     "m": 1778322111.0,
+     "ratio": 1.099,
+     "rx": 0,
+     "exempt_gap": 35674.4,
+     "fiscal": 4866832.16,
+     "fiscal_absent": 1012305.16
+    },
+    {
+     "year": 2023,
+     "code": 380,
+     "name": "Italy",
+     "basis": "total_less_reexports",
+     "lines": 2745,
+     "x_cif": 1253190283.14,
+     "m": 1120337614.0,
+     "ratio": 0.894,
+     "rx": 1271616.22,
+     "exempt_gap": 1671967.63,
+     "fiscal": 24872105.71,
+     "fiscal_absent": 1090502.93
+    },
+    {
+     "year": 2023,
+     "code": 784,
+     "name": "UAE",
+     "basis": "domestic",
+     "lines": 905,
+     "x_cif": 488869691.33,
+     "m": 535954117.0,
+     "ratio": 1.096,
+     "rx": 408381914.13,
+     "exempt_gap": 0,
+     "fiscal": 25530774.85,
+     "fiscal_absent": 970450.29
+    },
+    {
+     "year": 2023,
+     "code": 842,
+     "name": "United States",
+     "basis": "domestic",
+     "lines": 2157,
+     "x_cif": 516596637.9,
+     "m": 735443728.0,
+     "ratio": 1.424,
+     "rx": 47477048.0,
+     "exempt_gap": 27916548.15,
+     "fiscal": 20274395.88,
+     "fiscal_absent": 3830484.28
+    },
+    {
+     "year": 2024,
+     "code": 156,
+     "name": "China",
+     "basis": "total",
+     "lines": 3330,
+     "x_cif": 2216930885.4,
+     "m": 1979350971.0,
+     "ratio": 0.893,
+     "rx": 0,
+     "exempt_gap": 0,
+     "fiscal": 112622935.11,
+     "fiscal_absent": 44283764.45
+    },
+    {
+     "year": 2024,
+     "code": 300,
+     "name": "Greece",
+     "basis": "total",
+     "lines": 779,
+     "x_cif": 1386595995.44,
+     "m": 1564787282.0,
+     "ratio": 1.129,
+     "rx": 0,
+     "exempt_gap": 27.28,
+     "fiscal": 5335651.19,
+     "fiscal_absent": 1395970.17
+    },
+    {
+     "year": 2024,
+     "code": 380,
+     "name": "Italy",
+     "basis": "total_less_reexports",
+     "lines": 2694,
+     "x_cif": 959433398.98,
+     "m": 902799585.0,
+     "ratio": 0.941,
+     "rx": 881287.16,
+     "exempt_gap": 2149410.62,
+     "fiscal": 23468035.73,
+     "fiscal_absent": 1575516.38
+    },
+    {
+     "year": 2024,
+     "code": 682,
+     "name": "Saudi Arabia",
+     "basis": "domestic",
+     "lines": 442,
+     "x_cif": 211717196.49,
+     "m": 887909173.0,
+     "ratio": 4.194,
+     "rx": 663431.73,
+     "exempt_gap": 0,
+     "fiscal": 7109742.02,
+     "fiscal_absent": 1069517.82
+    },
+    {
+     "year": 2024,
+     "code": 842,
+     "name": "United States",
+     "basis": "domestic",
+     "lines": 2065,
+     "x_cif": 485952524.4,
+     "m": 583787885.0,
+     "ratio": 1.201,
+     "rx": 75149619.0,
+     "exempt_gap": 24727522.5,
+     "fiscal": 19337669.12,
+     "fiscal_absent": 3258444.88
+    }
+   ],
+   "note": "Every figure here is produced by the build itself. The reconciliation sums the HS-6 rows the build uses and sets them against the TOTAL row Comtrade publishes in the same file; a ratio other than 1.0000 would mean rows were double-counted or dropped. Mirror ratios between 0.8 and 1.2 are ordinary for two customs services; outside that range the basis column says why."
+  },
   "classification": "Lebanon reports in HS 2017 (H5); every partner in HS 2022 (H6). Partner codes are converted to HS 2017 with the UNSD HS2022-to-HS2017 conversion table before pairing. Codes the table cannot place stay one-sided and are labelled unmapped.",
   "hs_table": "UNSD HS2022toHS2017ConversionAndCorrelationTables.xlsx",
   "quantity_available": false,

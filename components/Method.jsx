@@ -1,10 +1,17 @@
 import { LOSS_TYPES } from "@/lib/losses";
+import { money } from "@/lib/format";
 import { Panel, PanelHead } from "@/components/ui";
+
+const BASIS_LABEL = {
+  domestic: "domestic exports",
+  total_less_reexports: "total less re-exports",
+  total: "total exports — no re-export split published",
+};
 
 /** Everything that was crowding the first screen, in one place, for whoever asks "how". */
 export default function Method({ meta, stamp }) {
   return (
-    <div className="fade-in max-w-4xl">
+    <div className="fade-in max-w-5xl">
       <Panel className="mb-6">
         <PanelHead title="What the portal compares" />
         <div className="px-5 py-4 text-[13.5px] text-ink2 leading-relaxed space-y-3">
@@ -66,6 +73,8 @@ export default function Method({ meta, stamp }) {
         </dl>
       </Panel>
 
+      {meta.validation && <Validation v={meta.validation} />}
+
       <Panel>
         <PanelHead title="Going live" sub={stamp?.live ? "This portal is reading live data" : `This portal is reading a snapshot built ${stamp?.generated ?? meta.generated}`} />
         <div className="px-5 py-4 text-[13px] text-ink2 leading-relaxed space-y-3">
@@ -88,6 +97,82 @@ export default function Method({ meta, stamp }) {
         </div>
       </Panel>
     </div>
+  );
+}
+
+/** The build's own checks, published with the data so a reader need not take the figures on trust. */
+function Validation({ v }) {
+  const ok = (r) => r.ratio != null && Math.abs(r.ratio - 1) < 0.0005;
+  const healthy = (p) => p.ratio != null && p.ratio >= 0.8 && p.ratio <= 1.2;
+  const allOk = v.reconciliation.every(ok);
+  return (
+    <Panel className="mb-6 !max-w-none">
+      <PanelHead title="How the numbers were checked" sub={v.note} />
+
+      <div className="px-5 pt-4 pb-2 flex items-baseline justify-between gap-4">
+        <div className="text-[13px] text-ink">1 · Reconciliation to source</div>
+        <div className={`text-[12px] num ${allOk ? "text-cedar" : "text-burgundy"}`}>
+          {allOk ? `all ${v.reconciliation.length} checks at 1.0000` : "a check is off — see below"}
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="dt">
+          <thead><tr><th>Year</th><th>File</th><th>Flow</th><th>Partner</th><th className="text-right">HS-6 lines</th><th className="text-right">Sum of lines used</th><th className="text-right">File&apos;s own TOTAL row</th><th className="text-right">Ratio</th></tr></thead>
+          <tbody>
+            {v.reconciliation.map((r, i) => (
+              <tr key={i}>
+                <td className="num">{r.year}</td><td>{r.reporter}</td><td className="num">{r.flow === "X" ? "exports" : "imports"}</td><td>{r.partner}</td>
+                <td className="text-right num">{r.lines == null ? "—" : r.lines.toLocaleString()}</td>
+                <td className="text-right num">{money(r.hs6_sum)}</td>
+                <td className="text-right num">{r.total_row == null ? "—" : money(r.total_row)}</td>
+                <td className={`text-right num ${ok(r) ? "text-cedar" : "text-burgundy"}`}>{r.ratio == null ? "—" : r.ratio.toFixed(4)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="px-5 pt-5 pb-2 text-[13px] text-ink">2 · Against published figures</div>
+      <div className="overflow-x-auto">
+        <table className="dt">
+          <thead><tr><th>Figure</th><th>Year</th><th className="text-right">This build</th><th className="text-right">Published</th><th className="text-right">Difference</th><th>Source</th></tr></thead>
+          <tbody>
+            {v.external.map((e, i) => (
+              <tr key={i}>
+                <td>{e.figure}</td><td className="num">{e.year}</td>
+                <td className="text-right num">{money(e.ours)}</td><td className="text-right num">{money(e.published)}</td>
+                <td className={`text-right num ${Math.abs(e.diff_pct) < 1 ? "text-cedar" : "text-burgundy"}`}>{e.diff_pct > 0 ? "+" : ""}{e.diff_pct.toFixed(2)}%</td>
+                <td className="text-[12px] text-slate1">{e.source}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="px-5 pt-5 pb-2 text-[13px] text-ink">3 · Each partner-year on the basis Lebanon books it</div>
+      <div className="overflow-x-auto">
+        <table className="dt">
+          <thead><tr><th>Year</th><th>Partner</th><th>Partner figure</th><th className="text-right">Partner (CIF)</th><th className="text-right">Lebanon</th><th className="text-right">Ratio</th><th className="text-right">Re-exports set aside</th><th className="text-right">Exempt gap</th><th className="text-right">Revenue not collected</th><th className="text-right">of which absent from all origins</th></tr></thead>
+          <tbody>
+            {v.partners.map((p, i) => (
+              <tr key={i}>
+                <td className="num">{p.year}</td><td className="whitespace-nowrap">{p.name}</td>
+                <td className="text-[12px] text-slate1">{BASIS_LABEL[p.basis] ?? p.basis}</td>
+                <td className="text-right num">{money(p.x_cif)}</td><td className="text-right num">{money(p.m)}</td>
+                <td className={`text-right num ${healthy(p) ? "text-cedar" : "text-gold"}`} title={healthy(p) ? "Within the ordinary range for two customs services" : p.ratio > 1.2 ? "Lebanon books more than the partner reports sending — the partner does not report this trade by destination, or goods reach Lebanon via a hub" : "Lebanon books much less than the partner reports"}>{p.ratio == null ? "—" : p.ratio.toFixed(2)}</td>
+                <td className="text-right num">{p.rx ? money(p.rx) : <span className="text-slate2">—</span>}</td>
+                <td className="text-right num">{p.exempt_gap ? money(p.exempt_gap) : <span className="text-slate2">—</span>}</td>
+                <td className="text-right num text-gold">{money(p.fiscal)}</td>
+                <td className="text-right num">{money(p.fiscal_absent)} <span className="text-slate2">({p.fiscal ? Math.round(100 * p.fiscal_absent / p.fiscal) : 0}%)</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="px-5 py-4 text-[12px] text-slate1 leading-relaxed">
+        Saudi Arabia reports its fuel exports without a destination, so Lebanon&apos;s $670M of Saudi fuel has no partner figure and the ratio runs high; it counts as outflow, never as revenue. China and Greece publish no re-export split, so their figures keep a hub component the build cannot remove.
+      </div>
+    </Panel>
   );
 }
 
