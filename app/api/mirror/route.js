@@ -24,9 +24,17 @@ function summarise(rows) {
     shortfall: 0, revenue_lines: 0,   // the lines where Lebanon registered less, and by how much
     by_reading: {},
   };
+  // One-sided headings that dominate the corridor are set aside from every
+  // total and reported separately, so the sentence and tiles read without them.
+  s.structural = { lines: 0, value: 0, headings: {} };
   for (const r of rows) {
     s[r.st] += 1;
     if (r.x > 0 && r.map) s.by_map[r.map] = (s.by_map[r.map] || 0) + 1;
+    if (r.rd === "structural") {
+      const h = (s.structural.headings[r.hs4] ||= { hs4: r.hs4, ch: r.ch, x: 0, m: 0, share: r.sx });
+      h.x += r.xc; h.m += r.m; s.structural.lines += 1; s.structural.value += r.xc + r.m;
+      continue;
+    }
     s.x_fob += r.x; s.x_cif += r.xc; s.m += r.m; s.gap += r.g;
     s.vat_all += r.vat;
     if (r.g > 0 && (r.rd === "under_invoicing" || r.rd === "value_gap" || r.rd === "not_in_lebanon")) {
@@ -39,6 +47,7 @@ function summarise(rows) {
     if (r.rx) s.rx = (s.rx || 0) + r.rx;
     s.by_reading[r.rd] = (s.by_reading[r.rd] || 0) + 1;
   }
+  s.structural.headings = Object.values(s.structural.headings).sort((a, b) => (b.x + b.m) - (a.x + a.m));
   s.cover = s.x_cif ? s.m / s.x_cif : null;
   s.vat_lost = s.vat_under + s.vat_unrecorded + s.vat_not_in_lebanon;
   return s;

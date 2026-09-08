@@ -20,6 +20,7 @@ const READING = {
   normal: { label: "Matches", tone: "cedar" },
   not_in_partner: { label: "Only in Lebanon's books", tone: "neutral" },
   exempt: { label: "Exempt regime", tone: "neutral" },
+  structural: { label: "Set aside · one-sided", tone: "sea" },
 };
 
 // How the partner's figure was built. Lebanon books by origin, so re-exports
@@ -33,7 +34,7 @@ const BASIS = {
 
 const BAR_TONE = {
   under_invoicing: "burgundy", value_gap: "sea", not_in_lebanon: "sea",
-  over_invoicing: "slate", normal: "cedar", not_in_partner: "slate", exempt: "slate",
+  over_invoicing: "slate", normal: "cedar", not_in_partner: "slate", exempt: "slate", structural: "sea",
 };
 
 // How the partner's HS-2022 code was placed on Lebanon's HS 2017.
@@ -57,18 +58,19 @@ const PAGE = 50;
 function rollup(rows, level, vatRate) {
   const map = new Map();
   for (const r of rows) {
-    const ex = r.rd === "exempt";
-    // An exempt heading never dissolves into its chapter: it would count as revenue there.
-    const code = ex && level < 6 ? r.hs4 : level === 2 ? r.hs2 : level === 4 ? r.hs4 : r.hs6;
-    const key = ex && level < 6 ? `${r.hs4}·exempt` : code;
+    const own = r.rd === "exempt" || r.rd === "structural" ? r.rd : null;
+    // An exempt or set-aside heading never dissolves into its chapter: it would count there.
+    const code = own && level < 6 ? r.hs4 : level === 2 ? r.hs2 : level === 4 ? r.hs4 : r.hs6;
+    const key = own && level < 6 ? `${r.hs4}·${own}` : code;
     const cur = map.get(key) || {
-      key, code, hs2: r.hs2, hs4: r.hs4, exempt: ex,
-      name: (r.ch || (r.hs2 === "99" ? "Unclassified — confidential or unallocated" : `Chapter ${r.hs2}`)) + (ex && level < 6 ? " — exempt regime" : ""),
+      key, code, hs2: r.hs2, hs4: r.hs4, own,
+      name: (r.ch || (r.hs2 === "99" ? "Unclassified — confidential or unallocated" : `Chapter ${r.hs2}`)) + (own && level < 6 ? (own === "exempt" ? " — exempt regime" : " — set aside") : ""),
       x: 0, xc: 0, m: 0, duty: 0, lines: 0, mapped: 0, rx: 0, lwBy: new Map(),
       partners: new Set(), editions: new Set(), maps: new Set(), pcs: new Set(),
     };
     cur.x += r.x; cur.xc += r.xc; cur.m += r.m; cur.lines += 1;
     if (r.rx) cur.rx += r.rx;
+    if (r.sx) cur.sx = r.sx;
     cur.lwBy.set(r.hs4, r.lw ?? 0);
     cur.partners.add(r.p);
     if (r.lv || r.pv) cur.editions.add(`${r.lv ?? "·"}/${r.pv ?? "·"}`);
@@ -81,7 +83,7 @@ function rollup(rows, level, vatRate) {
   for (const c of map.values()) {
     c.g = c.xc - c.m;
     c.cv = c.xc ? c.m / c.xc : null;
-    c.rd = c.exempt ? "exempt" : classifyCover(c.xc, c.m);
+    c.rd = c.own || classifyCover(c.xc, c.m);
     c.lw = [...c.lwBy.values()].reduce((a, b) => a + b, 0);
     const revenue = REVENUE_READINGS.has(c.rd) && c.g > 0;
     c.vat = revenue ? c.g * vatRate : 0;
@@ -261,7 +263,9 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             {many ? "say they" : "says it"} exported <span className="num text-ink">{money(s.x_cif)}</span> to Lebanon.
             Lebanon registered <span className="num text-ink">{money(s.m)}</span>,{" "}
             <span className={`num ${s.gap > 0 ? "text-burgundy" : "text-ink"}`}>{money(Math.abs(s.gap))}</span>{" "}
-            {s.gap > 0 ? "less" : "more"} in total.
+            {s.gap > 0 ? "less" : "more"} in total{s.structural?.value > 0 && (
+              <> — after setting aside <span className="num text-sea">{money(s.structural.value)}</span> in one-sided {s.structural.headings.map((h) => `HS ${h.hs4}`).join(", ")}</>
+            )}.
             {s.gap <= 0 && " But "}{s.gap > 0 && " "}
             {s.gap <= 0 ? "on" : "On"} <span className="num text-ink">{s.revenue_lines.toLocaleString()}</span> products Lebanon
             registered <span className="num text-burgundy">{money(s.shortfall)}</span> less than {many ? "the partners" : name} reported,
@@ -270,10 +274,27 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
             <Tile label={`${many ? "Partners" : name} exported`} value={money(s.x_cif)} sub={`${money(s.x_fob)} FOB, CIF-adjusted ×${avail?.meta?.cif_factor ?? 1.05}`} />
-            <Tile label="Lebanon registered" value={money(s.m)} sub={s.cover == null ? "—" : `${Math.round(s.cover * 100)}% of the partner figure`} />
+            <Tile label="Lebanon registered" value={money(s.m)} sub={`${s.cover == null ? "—" : `${Math.round(s.cover * 100)}% of the partner figure`}${s.structural?.value ? ` · ${money(s.structural.value)} set aside` : ""}`} />
             <Tile label="Difference in total" value={money(s.gap)} tone={s.gap > 0 ? "burgundy" : "ink"} sub={s.gap > 0 ? "Lebanon registered less overall" : "Lebanon registered more overall"} />
             <Tile label="VAT not collected" value={money(s.vat_lost)} tone="gold" sub={`${Math.round(rate * 100)}% of ${money(s.shortfall)} short on ${s.revenue_lines.toLocaleString()} products · netted within chapter: ${money(conservative.vat)}`} />
           </div>
+
+          {/* One-sided headings that would dominate the corridor, set aside and said out loud. */}
+          {s.structural?.headings?.length > 0 && (
+            <div className="rounded-lg border border-sea/40 bg-sea/5 border-l-[3px] border-l-sea px-4 py-3.5 mb-6 flex gap-3">
+              <Icon name="info" className="w-4 h-4 text-sea mt-0.5" />
+              <div className="text-[13px] text-ink2 leading-relaxed">
+                <span className="text-ink">Set aside from this analysis.</span>{" "}
+                {s.structural.headings.map((h) => (
+                  <span key={h.hs4}>
+                    HS {h.hs4} {h.ch}: <span className="num text-ink">{money(h.m || h.x)}</span>, {Math.round(h.share * 100)}% of everything{" "}
+                    {h.m > h.x ? `Lebanon registers from ${name}, and absent from ${name}'s export records` : `${name} reports sending, and absent from Lebanon's records`}.{" "}
+                  </span>
+                ))}
+                A heading that large on one side only is a reporting-practice question — {name === "Saudi Arabia" ? "Saudi Arabia reports its fuel exports to no destination at all" : "one customs service does not report this trade by destination"} — not a customs gap. It is counted in neither the figures above nor the VAT, and it is listed under &quot;Every product&quot; with a set-aside tag.
+              </div>
+            </div>
+          )}
 
           {/* How to read the two figures — the part people trip on. */}
           <details className="group rounded-lg border border-rule bg-bone/70 mb-6 open:bg-bone open:shadow-card transition-colors">
@@ -343,6 +364,9 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                             ))}
                             {lvl < 6 && r.mapped > 0 && (
                               <span className="text-[10px] uppercase tracking-wider num text-slate2 border border-rule rounded px-1" title={`${r.mapped} of ${r.lines} lines were recoded between HS editions with the official table`}>{r.mapped} recoded</span>
+                            )}
+                            {r.rd === "structural" && (
+                              <span className="text-[10px] uppercase tracking-wider num text-sea border border-sea/40 rounded px-1" title={`${Math.round((r.sx ?? 0) * 100)}% of this corridor sits in this one heading, on one side only — a reporting-practice question, not a customs gap. Counted in no total.`}>set aside · {Math.round((r.sx ?? 0) * 100)}% of corridor</span>
                             )}
                             {r.rd === "exempt" && (
                               <span className="text-[10px] uppercase tracking-wider num text-slate2 border border-rule rounded px-1" title="Enters under an exemption regime (military, aircraft): no VAT is booked on entry, so this gap is not revenue">exempt regime</span>
@@ -469,6 +493,8 @@ function Detail({ r, name, rate, cif, level, chapter, balances, absent }) {
             <p><span className="text-ink">{loss.label}.</span> {loss.what}</p>
             <p className="text-slate1"><span className="text-ink2">What to do:</span> {loss.remedy}</p>
           </>
+        ) : r.rd === "structural" ? (
+          <p className="text-[13px] text-ink2 leading-relaxed"><span className="text-ink">Set aside.</span> This one heading is {Math.round((r.sx ?? 0) * 100)}% of everything on its side of the corridor and appears on that side only. A gap of that shape is a reporting-practice question — one customs service does not report this trade by destination — not a customs gap. It is counted in neither the totals above nor the VAT.</p>
         ) : r.rd === "exempt" ? (
           <p className="text-[13px] text-ink2 leading-relaxed"><span className="text-ink">Exempt regime.</span> Military equipment and aircraft enter under exemptions: {name} reports the export, Lebanese customs books no VAT on the entry. The gap is shown for completeness and carries no revenue.</p>
         ) : r.rd === "not_in_lebanon" ? (

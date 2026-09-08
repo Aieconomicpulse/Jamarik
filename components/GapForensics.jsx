@@ -13,6 +13,7 @@ const SIG_TONE = {
   value_gap: "neutral",
   normal: "cedar",
   exempt: "neutral",
+  structural: "sea",
 };
 
 const PAGE_STEP = 40;
@@ -38,7 +39,7 @@ export default function GapForensics({ data, onOpenProducts }) {
   const rows = useMemo(
     () =>
       corridors.filter((c) => {
-        if (signature === "flagged" && (c.signature === "normal" || c.signature === "exempt")) return false;
+        if (signature === "flagged" && (c.signature === "normal" || c.signature === "exempt" || c.signature === "structural")) return false;
         if (signature !== "all" && signature !== "flagged" && c.signature !== signature)
           return false;
         if (chapter !== "all" && c.hs2 !== chapter) return false;
@@ -48,8 +49,9 @@ export default function GapForensics({ data, onOpenProducts }) {
   );
 
   const silentPartners = meta.reporters.filter((r) => !r.has_data);
-  const flaggedCount = corridors.filter((c) => c.signature !== "normal" && c.signature !== "exempt").length;
+  const flaggedCount = corridors.filter((c) => !["normal", "exempt", "structural"].includes(c.signature)).length;
   const exemptCount = corridors.filter((c) => c.signature === "exempt").length;
+  const structuralCount = corridors.filter((c) => c.signature === "structural").length;
   const shown = rows.slice(0, limit);
   const subtotal = rows.reduce((s, r) => s + Math.max(0, r.vat_floor), 0);
 
@@ -70,6 +72,7 @@ export default function GapForensics({ data, onOpenProducts }) {
             ["over_invoicing", `Over-invoicing (${sig.over_invoicing})`],
             ["value_gap", `Unclassified gap (${sig.value_gap})`],
             ["exempt", `Exempt regime (${exemptCount})`],
+            ["structural", `Set aside · one-sided (${structuralCount})`],
             ["all", `Everything incl. normal (${corridors.length})`],
           ]}
         />

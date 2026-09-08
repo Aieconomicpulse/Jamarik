@@ -60,6 +60,25 @@ EXEMPT_HS = ("8710", "8802", "8803", "8805", "8806", "8906", "93")
 def is_exempt(code: str) -> bool:
     return code.startswith(EXEMPT_HS)
 
+
+# Extraordinary one-sided headings. A heading that is at least this share of
+# the side it appears on, while the other side holds almost none of it, is a
+# reporting-practice question rather than a customs gap: Saudi Arabia books
+# every barrel of fuel to "Areas, not elsewhere specified", so Lebanon's $670M
+# of Saudi fuel has no partner figure at all. Such a heading would dominate
+# every total for that corridor, so it is set aside from all of them and shown
+# on its own.
+STRUCTURAL_SHARE = 0.30
+ONE_SIDED = 0.05
+
+
+def structural_share(x: float, m: float, total_x: float, total_m: float):
+    if m > 0 and x < ONE_SIDED * m and total_m and m >= STRUCTURAL_SHARE * total_m:
+        return m / total_m
+    if x > 0 and m < ONE_SIDED * x and total_x and x >= STRUCTURAL_SHARE * total_x:
+        return x / total_x
+    return None
+
 UNDER_LO, UNDER_HI = 0.40, 0.85
 OVER_RATIO = 1.60
 
@@ -355,6 +374,7 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
     ptr["hs4"] = ptr.h17.str[:4]
     a = leb.groupby("hs4").primaryValue.sum().rename("m")
     b = ptr.groupby("hs4").agg(x_fob=("primaryValue", "sum"), x_kg=("netWgt", "sum"), rx=("rx", "sum"))
+    total_x, total_m = float(b.x_fob.sum()) * CIF_FACTOR, float(a.sum())
     frame = pd.concat([a, b], axis=1).fillna(0.0).reset_index()
     frame = frame[(frame.x_fob >= MIN_PARTNER_VALUE) & (~frame.hs4.isin(EXCLUDED_HS4))]
 
@@ -363,7 +383,8 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
         x_cif = r.x_fob * CIF_FACTOR
         gap = x_cif - r.m                       # positive = Lebanon declared less
         cover = r.m / x_cif if x_cif else 0.0
-        sig = "exempt" if is_exempt(r.hs4) else classify(cover)
+        share = structural_share(x_cif, r.m, total_x, total_m)
+        sig = "structural" if share else ("exempt" if is_exempt(r.hs4) else classify(cover))
         hs2 = r.hs4[:2]
         rate = duty_rate(hs2)
         m_world = float(world4.get(r.hs4, 0.0))
@@ -394,6 +415,7 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
             "rx": round(r.rx, 2) if r.rx == r.rx else None,   # re-exports through the partner, FOB
             "m_world": round(m_world, 2),                     # Lebanon's imports of the heading from every origin
             "absent": bool(x_cif > 0 and m_world < 0.85 * x_cif),
+            "share": round(share, 3) if share else None,   # of the corridor, when set aside as one-sided
             "signature": sig,
             "shortfall": round(shortfall, 2),
             "outflow": round(outflow, 2),
@@ -429,6 +451,7 @@ def summarise(rows: list[dict]) -> dict:
         "over": {"count": counts["over_invoicing"], "outflow": s("outflow", is_over)},
         "normal": {"count": counts["normal"]},
         "exempt": {"count": counts["exempt"], "gap": s("gap", lambda c: c["signature"] == "exempt" and c["gap"] > 0)},
+        "structural": {"count": counts["structural"]},
         "vat_floor": s("vat_floor"),
         "duty_loss": s("duty_loss"),
         "fiscal_loss": s("fiscal_loss"),
@@ -547,13 +570,17 @@ def main() -> None:
         for code in partners_by_year[year]:
             lines = [r for r in hs6 if r["y"] == year and r["p"] == code]
             cs = [c for c in corridors if c["year"] == year and c["partner"] == code]
-            x = sum(r["xc"] for r in lines); m = sum(r["m"] for r in lines)
+            kept = [r for r in lines if r["rd"] != "structural"]
+            x = sum(r["xc"] for r in kept); m = sum(r["m"] for r in kept)
+            aside = [r for r in lines if r["rd"] == "structural"]
             fiscal = sum(c["fiscal_loss"] for c in cs if c["signature"] in ("under_invoicing", "value_gap") and c["gap"] > 0)
             absent = sum(c["fiscal_loss"] for c in cs if c["signature"] in ("under_invoicing", "value_gap") and c["gap"] > 0 and c["absent"])
             pv.append({
                 "year": year, "code": code, "name": COUNTRY.get(code, str(code)),
                 "basis": EXPORT_BASIS.get(f"{year}:{code}"),
                 "lines": len(lines), "x_cif": round(x, 2), "m": round(m, 2), "ratio": round(m / x, 3) if x else None,
+                "set_aside": round(sum(r["xc"] + r["m"] for r in aside), 2),
+                "set_aside_hs4": sorted({r["hs4"] for r in aside}),
                 "rx": round(sum(r["rx"] or 0 for r in lines), 2),
                 "exempt_gap": round(sum(r["g"] for r in lines if r["rd"] == "exempt" and r["g"] > 0), 2),
                 "fiscal": round(fiscal, 2), "fiscal_absent": round(absent, 2),
@@ -595,7 +622,14 @@ def main() -> None:
                 "normal": "Within normal asymmetry",
                 "smuggling_risk": "Goods not presented",
                 "exempt": "Exempt regime · military & aircraft",
+                "structural": "Set aside · one-sided heading",
             },
+            "structural_rule": (
+                f"A heading that is at least {int(STRUCTURAL_SHARE * 100)}% of the side it appears on, "
+                f"with the other side holding under {int(ONE_SIDED * 100)}% of it, is set aside from every "
+                "total and shown on its own: it is a reporting-practice question, not a customs gap."
+            ),
+            "structural_share": STRUCTURAL_SHARE,
             "partner_basis": (
                 "Lebanon books imports by country of origin, so a partner's re-exports never "
                 "appear under that partner. The partner figure is domestic exports (DX) where "
@@ -740,6 +774,14 @@ def hs6_rows(lebanon: pd.DataFrame, partner: pd.DataFrame, code: int, year: int,
             (r.rx if r.rx == r.rx else 0.0) if has_rx else float("nan"),
             float(world4.get(r.cmdCode[:4], 0.0)),
         ))
+    tx, tm = sum(r["xc"] for r in out), sum(r["m"] for r in out)
+    by4: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0])
+    for r in out:
+        by4[r["hs4"]][0] += r["xc"]; by4[r["hs4"]][1] += r["m"]
+    for r in out:
+        share = structural_share(*by4[r["hs4"]], tx, tm)
+        if share:
+            r["rd"], r["vat"], r["duty"], r["sx"] = "structural", 0.0, 0.0, round(share, 3)
     return out
 
 
@@ -747,7 +789,8 @@ def write_hs6(rows: list[dict], out: Path) -> None:
     out.write_text(json.dumps({
         "meta": {"cif_factor": CIF_FACTOR, "vat_rate": VAT_RATE, "countries": COUNTRY,
                  "generated": date.today().isoformat(),
-                 "basis": dict(EXPORT_BASIS), "exempt_hs": list(EXEMPT_HS)},
+                 "basis": dict(EXPORT_BASIS), "exempt_hs": list(EXEMPT_HS),
+                 "structural_share": STRUCTURAL_SHARE, "one_sided": ONE_SIDED},
         "rows": rows,
     }, separators=(",", ":")))
     print(f"  {len(rows):,} HS-6 lines -> {out} ({out.stat().st_size/1e6:.1f} MB)")

@@ -70,6 +70,7 @@ export default function Method({ meta, stamp }) {
           <Row k="Classification">{meta.classification ?? "Lebanon reports in HS 2017; partners in HS 2022. Partner codes are converted to HS 2017 with the official UNSD table before pairing."} Where a chapter balances but its headings gap in opposite directions, the two customs services are coding the same goods differently — the Products screen tags those lines rather than counting them as revenue.</Row>
           <Row k="Partner figure">{meta.partner_basis ?? "Domestic exports where the partner publishes them; total exports less re-exports where only re-exports are published; total exports otherwise."} Re-exports never appear under the shipping partner in Lebanon&apos;s books, so they are not a gap.</Row>
           <Row k="Exempt regimes">Military equipment (HS 8710, chapter 93) and aircraft with their parts (8802–8806, 8906) enter under exemption regimes: the partner reports the export, Lebanese customs books no VAT on the entry. Those lines are shown, read as &quot;exempt&quot;, and carry no revenue.</Row>
+          <Row k="Set aside">{meta.structural_rule ?? "A heading that is at least 30% of the side it appears on, with the other side holding almost none of it, is set aside from every total and shown on its own."} Saudi fuel is the type case: Lebanon registers $670M of it, Saudi Arabia reports its fuel to no destination at all.</Row>
           <Row k="Attribution test">Every heading also carries Lebanon&apos;s imports of it from every origin. Where that is below what one partner alone says it sent, the goods are absent from Lebanon&apos;s books under any origin — tagged &quot;absent from all origins&quot;, the strongest signal this method gives. Where Lebanon books at least as much from other origins, the gap may be origin attribution and is read with more caution.</Row>
           <Row k="Standing">Per the WCO, mirror gaps show where to investigate. They are risk indicators, not findings, and name no party as fraudulent.</Row>
         </dl>
@@ -158,7 +159,7 @@ function Validation({ v }) {
       <div className="px-5 pt-5 pb-2 text-[13px] text-ink">3 · Each partner-year on the basis Lebanon books it</div>
       <div className="overflow-x-auto">
         <table className="dt">
-          <thead><tr><th>Year</th><th>Partner</th><th>Partner figure</th><th className="text-right">Partner (CIF)</th><th className="text-right">Lebanon</th><th className="text-right">Ratio</th><th className="text-right">Re-exports set aside</th><th className="text-right">Exempt gap</th><th className="text-right">Revenue lost</th><th className="text-right">Absent from all origins</th></tr></thead>
+          <thead><tr><th>Year</th><th>Partner</th><th>Partner figure</th><th className="text-right">Partner (CIF)</th><th className="text-right">Lebanon</th><th className="text-right">Ratio</th><th className="text-right">One-sided set aside</th><th className="text-right">Re-exports</th><th className="text-right">Exempt gap</th><th className="text-right">Revenue lost</th><th className="text-right">Absent from all origins</th></tr></thead>
           <tbody>
             {v.partners.map((p, i) => (
               <tr key={i}>
@@ -166,6 +167,7 @@ function Validation({ v }) {
                 <td className="text-[12px] text-slate1 whitespace-nowrap">{BASIS_LABEL[p.basis] ?? p.basis}</td>
                 <td className="text-right num">{money(p.x_cif)}</td><td className="text-right num">{money(p.m)}</td>
                 <td className={`text-right num ${healthy(p) ? "text-cedar" : "text-gold"}`} title={healthy(p) ? "Within the ordinary range for two customs services" : p.ratio > 1.2 ? "Lebanon books more than the partner reports sending — the partner does not report this trade by destination, or goods reach Lebanon via a hub" : "Lebanon books much less than the partner reports"}>{p.ratio == null ? "—" : p.ratio.toFixed(2)}</td>
+                <td className="text-right num" title={p.set_aside_hs4?.length ? `HS ${p.set_aside_hs4.join(", ")}` : ""}>{p.set_aside ? <span className="text-sea">{money(p.set_aside)} <span className="text-slate2">· {p.set_aside_hs4.join(", ")}</span></span> : <span className="text-slate2">—</span>}</td>
                 <td className="text-right num">{small(p.rx)}</td>
                 <td className="text-right num">{small(p.exempt_gap)}</td>
                 <td className="text-right num text-gold">{money(p.fiscal)}</td>
@@ -176,7 +178,7 @@ function Validation({ v }) {
         </table>
       </div>
       <div className="px-5 py-4 text-[12px] text-slate1 leading-relaxed">
-        Saudi Arabia reports its fuel exports without a destination, so Lebanon&apos;s $670M of Saudi fuel has no partner figure and the ratio runs high; it counts as outflow, never as revenue. China and Greece publish no re-export split, so their figures keep a hub component the build cannot remove.
+        Ratios are computed without the set-aside headings. Saudi Arabia reports its fuel exports without a destination, so Lebanon&apos;s $670M of Saudi fuel has no partner figure; it is set aside and counts in nothing. China and Greece publish no re-export split, so their figures keep a hub component the build cannot remove.
       </div>
     </Panel>
   );
