@@ -5,13 +5,15 @@ import { Panel, PanelHead } from "@/components/ui";
 const BASIS_LABEL = {
   domestic: "domestic exports",
   total_less_reexports: "total less re-exports",
-  total: "total exports — no re-export split published",
+  total: "total (no re-export split)",
 };
+const small = (v) => (v ? (v < 1e4 ? <span className="text-slate2">&lt;$10K</span> : money(v)) : <span className="text-slate2">—</span>);
 
 /** Everything that was crowding the first screen, in one place, for whoever asks "how". */
 export default function Method({ meta, stamp }) {
   return (
-    <div className="fade-in max-w-5xl">
+    <div className="fade-in">
+      <div className="max-w-5xl">
       <Panel className="mb-6">
         <PanelHead title="What the portal compares" />
         <div className="px-5 py-4 text-[13.5px] text-ink2 leading-relaxed space-y-3">
@@ -73,8 +75,11 @@ export default function Method({ meta, stamp }) {
         </dl>
       </Panel>
 
+      </div>
+
       {meta.validation && <Validation v={meta.validation} />}
 
+      <div className="max-w-5xl">
       <Panel>
         <PanelHead title="Going live" sub={stamp?.live ? "This portal is reading live data" : `This portal is reading a snapshot built ${stamp?.generated ?? meta.generated}`} />
         <div className="px-5 py-4 text-[13px] text-ink2 leading-relaxed space-y-3">
@@ -96,6 +101,7 @@ export default function Method({ meta, stamp }) {
           </dl>
         </div>
       </Panel>
+      </div>
     </div>
   );
 }
@@ -106,7 +112,7 @@ function Validation({ v }) {
   const healthy = (p) => p.ratio != null && p.ratio >= 0.8 && p.ratio <= 1.2;
   const allOk = v.reconciliation.every(ok);
   return (
-    <Panel className="mb-6 !max-w-none">
+    <Panel className="mb-6">
       <PanelHead title="How the numbers were checked" sub={v.note} />
 
       <div className="px-5 pt-4 pb-2 flex items-baseline justify-between gap-4">
@@ -152,16 +158,16 @@ function Validation({ v }) {
       <div className="px-5 pt-5 pb-2 text-[13px] text-ink">3 · Each partner-year on the basis Lebanon books it</div>
       <div className="overflow-x-auto">
         <table className="dt">
-          <thead><tr><th>Year</th><th>Partner</th><th>Partner figure</th><th className="text-right">Partner (CIF)</th><th className="text-right">Lebanon</th><th className="text-right">Ratio</th><th className="text-right">Re-exports set aside</th><th className="text-right">Exempt gap</th><th className="text-right">Revenue not collected</th><th className="text-right">of which absent from all origins</th></tr></thead>
+          <thead><tr><th>Year</th><th>Partner</th><th>Partner figure</th><th className="text-right">Partner (CIF)</th><th className="text-right">Lebanon</th><th className="text-right">Ratio</th><th className="text-right">Re-exports set aside</th><th className="text-right">Exempt gap</th><th className="text-right">Revenue lost</th><th className="text-right">Absent from all origins</th></tr></thead>
           <tbody>
             {v.partners.map((p, i) => (
               <tr key={i}>
                 <td className="num">{p.year}</td><td className="whitespace-nowrap">{p.name}</td>
-                <td className="text-[12px] text-slate1">{BASIS_LABEL[p.basis] ?? p.basis}</td>
+                <td className="text-[12px] text-slate1 whitespace-nowrap">{BASIS_LABEL[p.basis] ?? p.basis}</td>
                 <td className="text-right num">{money(p.x_cif)}</td><td className="text-right num">{money(p.m)}</td>
                 <td className={`text-right num ${healthy(p) ? "text-cedar" : "text-gold"}`} title={healthy(p) ? "Within the ordinary range for two customs services" : p.ratio > 1.2 ? "Lebanon books more than the partner reports sending — the partner does not report this trade by destination, or goods reach Lebanon via a hub" : "Lebanon books much less than the partner reports"}>{p.ratio == null ? "—" : p.ratio.toFixed(2)}</td>
-                <td className="text-right num">{p.rx ? money(p.rx) : <span className="text-slate2">—</span>}</td>
-                <td className="text-right num">{p.exempt_gap ? money(p.exempt_gap) : <span className="text-slate2">—</span>}</td>
+                <td className="text-right num">{small(p.rx)}</td>
+                <td className="text-right num">{small(p.exempt_gap)}</td>
                 <td className="text-right num text-gold">{money(p.fiscal)}</td>
                 <td className="text-right num">{money(p.fiscal_absent)} <span className="text-slate2">({p.fiscal ? Math.round(100 * p.fiscal_absent / p.fiscal) : 0}%)</span></td>
               </tr>
