@@ -25,7 +25,7 @@ const BANDS = [
 
 const SIG_TONE = { under_invoicing: "burgundy", value_gap: "gold", over_invoicing: "neutral", normal: "cedar" };
 
-export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
+export default function Analytics({ data, onOpenProducts, onOpenLedger, yearControl }) {
   const { meta, corridors = [] } = data;
   // Partner names back to codes, so a click can open the product view.
   const partnerCode = useMemo(() => {
@@ -60,6 +60,12 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger }) {
 
   return (
     <div className="fade-in">
+      {yearControl && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-5">
+          <div className="flex items-center gap-3"><span className="eyebrow">Year</span>{yearControl}</div>
+          <div className="text-[12.5px] text-slate1 num">{meta.reporters?.map((p) => p.name).join(" · ")}</div>
+        </div>
+      )}
       {/* Numbers first */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
         <Tile label="Revenue not collected" value={money(s.fiscal)} tone="gold" />

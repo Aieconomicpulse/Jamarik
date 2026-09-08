@@ -6,7 +6,6 @@ import Analytics from "@/components/Analytics";
 import GapForensics from "@/components/GapForensics";
 import TradeDetective from "@/components/TradeDetective";
 import Method from "@/components/Method";
-import { money } from "@/lib/format";
 import { summary } from "@/lib/losses";
 import { Icon, Segmented } from "@/components/ui";
 
@@ -65,8 +64,13 @@ export default function CustomsGap({ gaps, stamp }) {
     };
   }, [scope, meta, gaps.years, year, years]);
 
-  const s = summary(scope);
   const productYear = year === "all" ? meta.base_year : Number(year);
+
+  // Products has its own year selector; the other tabs share this one.
+  const yearControl = (
+    <Segmented size="sm" label="Year" value={year} onChange={setYear}
+      options={[...years.map((y) => [String(y), String(y)]), ["all", "Both"]]} />
+  );
 
   // Open the product view on a partner, chapter or heading another screen pointed at.
   const openProducts = (f = {}) => {
@@ -75,11 +79,9 @@ export default function CustomsGap({ gaps, stamp }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const partnersThisYear = (year === "all" ? meta.comparable_partners : gaps.years?.[year]?.partners) || [];
-
   return (
     <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-8">
-      <header className="mb-6 grid lg:grid-cols-[minmax(0,1fr)_380px] gap-x-12 gap-y-4 items-end fade-in">
+      <header className="mb-8 grid lg:grid-cols-[minmax(0,1fr)_380px] gap-x-12 gap-y-4 items-end fade-in">
         <div>
           <div className="eyebrow text-cedar mb-2.5">
             Trade-mirror forensics · Lebanon · {years.join(" & ")}
@@ -93,23 +95,6 @@ export default function CustomsGap({ gaps, stamp }) {
           The difference is revenue not collected.
         </p>
       </header>
-
-      {/* Year switch — one control, drives every tab below. */}
-      <div className="rounded-lg border border-rule bg-bone/80 shadow-card px-4 py-3 mb-5 flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="flex items-center gap-3">
-          <span className="eyebrow">Year</span>
-          <Segmented label="Year" value={year} onChange={setYear}
-            options={[...years.map((y) => [String(y), String(y)]), ["all", "Both"]]} />
-        </div>
-        <div className="text-[12.5px] text-slate1 num hidden md:block">
-          {partnersThisYear.map((p) => p.name).join(" · ")}
-        </div>
-        <div className="text-[12.5px] text-slate1 num ml-auto">
-          <span className="text-ink font-medium">{money(s.fiscal)}</span> uncollected ·{" "}
-          <span className="text-slate2">{money(s.outflow)} outflow</span> ·{" "}
-          {s.flagged} of {s.corridors} corridors flagged
-        </div>
-      </div>
 
       {/* Sections. The selected one is filled gold; the rest wait quietly. */}
       <nav aria-label="Sections" className="mb-8 -mx-5 px-5 lg:mx-0 lg:px-0 overflow-x-auto">
@@ -138,10 +123,10 @@ export default function CustomsGap({ gaps, stamp }) {
 
       {tab === "products" && <Products defaultYear={productYear} focus={focus} vatRate={meta.vat_rate} />}
       {tab === "analytics" && (
-        <Analytics data={slice} onOpenProducts={openProducts} onOpenLedger={() => setTab("ledger")} />
+        <Analytics data={slice} onOpenProducts={openProducts} onOpenLedger={() => setTab("ledger")} yearControl={yearControl} />
       )}
-      {tab === "ledger" && <GapForensics data={slice} onOpenProducts={openProducts} />}
-      {tab === "detective" && <TradeDetective data={slice} />}
+      {tab === "ledger" && <GapForensics data={slice} onOpenProducts={openProducts} yearControl={yearControl} />}
+      {tab === "detective" && <TradeDetective data={slice} yearControl={yearControl} />}
       {tab === "method" && <Method meta={meta} stamp={stamp} />}
     </div>
   );

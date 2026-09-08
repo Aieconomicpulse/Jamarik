@@ -23,7 +23,7 @@ const PAGE_STEP = 40;
  * behind the triage queue. Headline figures and methodology live in Triage; this
  * view stays deliberately plain so every row can be read and exported.
  */
-export default function GapForensics({ data, onOpenProducts }) {
+export default function GapForensics({ data, onOpenProducts, yearControl }) {
   const { meta, sig_counts: sig, corridors = [] } = data;
 
   const [signature, setSignature] = useState("flagged");
@@ -58,6 +58,7 @@ export default function GapForensics({ data, onOpenProducts }) {
   return (
     <div className="fade-in">
       <div className="flex flex-wrap items-center gap-3 mb-4">
+        {yearControl}
         <Select
           label="Filter by signature"
           value={signature}

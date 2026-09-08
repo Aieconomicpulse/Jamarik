@@ -79,7 +79,7 @@ function MessageText({ text }) {
   );
 }
 
-export default function TradeDetective({ data }) {
+export default function TradeDetective({ data, yearControl }) {
   const context = useMemo(() => buildContext(data), [data]);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
@@ -143,6 +143,7 @@ export default function TradeDetective({ data }) {
         <PanelHead
           title="Trade Detective"
           sub="Ask about the flagged corridors, signatures and revenue at risk · powered by Claude"
+          right={yearControl}
         />
 
         <div ref={scroller} className="flex-1 overflow-y-auto thin-scroll px-5 py-5 space-y-4 max-h-[52vh]">
