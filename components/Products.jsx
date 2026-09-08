@@ -481,7 +481,7 @@ function Detail({ r, name, rate, cif, level, chapter, balances, absent }) {
         )}
         {r.rx > 0 && (
           <><dt className="eyebrow text-[10px] pt-0.5">Re-exported via {name}</dt>
-          <dd className="num text-ink">{money(r.rx)} <span className="text-slate2">— goods of another origin shipped on; Lebanon books them under that origin, so they are set aside</span></dd></>
+          <dd className="num text-ink">{money(r.rx)} <span className="text-slate2">{r.rd === "structural" ? `— goods of another origin shipped on, which Lebanon booked as ${name}-origin` : "— goods of another origin shipped on; Lebanon books them under that origin, so they are set aside"}</span></dd></>
         )}
         {r.xc > 0 && (
           <><dt className="eyebrow text-[10px] pt-0.5">All origins{level === 6 ? `, heading ${r.hs4}` : ""}</dt>
@@ -499,7 +499,10 @@ function Detail({ r, name, rate, cif, level, chapter, balances, absent }) {
             <p className="text-slate1"><span className="text-ink2">What to do:</span> {loss.remedy}</p>
           </>
         ) : r.rd === "structural" ? (
-          <p className="text-[13px] text-ink2 leading-relaxed"><span className="text-ink">Set aside.</span> This one heading is {Math.round((r.sx ?? 0) * 100)}% of everything on its side of the corridor and appears on that side only. A gap of that shape is a reporting-practice question — one customs service does not report this trade by destination — not a customs gap. It is counted in neither the totals above nor the VAT.</p>
+          <p className="text-[13px] text-ink2 leading-relaxed"><span className="text-ink">Set aside.</span> This one heading is {Math.round((r.sx ?? 0) * 100)}% of everything on its side of the corridor and appears on that side only. A gap of that shape is a reporting-practice question, not a customs gap:{" "}
+            {r.m > r.xc && r.rx > 0.5 * r.m ? `${name} only re-exported these goods (${money(r.rx)}), and Lebanon booked them as ${name}-origin.`
+              : r.m > r.xc ? `${name} does not report this trade by destination.`
+              : "Lebanon has no record of it under any origin."} It is counted in neither the totals above nor the VAT.</p>
         ) : r.rd === "exempt" ? (
           <p className="text-[13px] text-ink2 leading-relaxed"><span className="text-ink">Exempt regime.</span> Military equipment and aircraft enter under exemptions: {name} reports the export, Lebanese customs books no VAT on the entry. The gap is shown for completeness and carries no revenue.</p>
         ) : r.rd === "not_in_lebanon" ? (
