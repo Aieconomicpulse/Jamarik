@@ -90,6 +90,34 @@ python pipeline/build_mirror.py --dir "collected data" \
     --out data/mirror_gaps.json --hs6-out data/mirror_hs6.json
 ```
 
+After `build_mirror.py`, run the post-processor:
+
+```bash
+python pipeline/estimate.py --gaps data/mirror_gaps.json --hs6 data/mirror_hs6.json
+```
+
+It rebuilds `corridors[]` symmetrically (a heading is a corridor when **either**
+side reaches $250k, so Lebanon-only headings are kept and read
+`not_in_partner`), lets the one-sided rule see both sides, writes
+`meta.estimate` (gross / central / lo / hi / floor per year and partner) and
+puts `p_real` on every flagged corridor: the share of its fiscal loss that
+survives the noise correction.
+
+**Why a reflected tail.** Two customs services classify, time and value the
+same goods differently, so a mirror comparison shows gaps in both directions
+even when nobody cheats. Under-declaration only ever produces gaps in one
+direction (Lebanon below the partner). The mirror image of the
+under-declaration band — corridors where Lebanon records *more* than the
+partner by the same log-distance — contains noise and over-declaration but no
+under-declaration, so it says how many "under-declared" corridors ordinary
+noise would produce on its own. The share of a band explained by noise is
+`n_mirror / n_band` (capped at 1); the fiscal loss that survives is
+`band_fiscal × (1 − that share)`. Because over-declaration inflates the noise
+estimate, the result is conservative. A 400-draw bootstrap over corridors
+gives the 90% interval. The "floor" is a second, cruder correction — net
+shortfall per partner-year × the effective VAT-plus-duty rate — and should
+land in the same region.
+
 `collected data/` is the folder of raw downloads and is gitignored (1 GB+).
 Files may be `.csv`, `.gz` or `.zip`, named either the Comtrade way
 (`C_A_H6_842_2024.gz`) or by hand (`USA_842_H6_2023.csv`). Repeat downloads
