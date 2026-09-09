@@ -5,11 +5,11 @@ import { money, pct } from "@/lib/format";
 import { Chip, Panel, Select } from "@/components/ui";
 
 // Signature → chip colour. Under-invoicing reads as the value crime (burgundy),
-// smuggling as the quantity crime (gold), normal asymmetry as healthy (cedar).
+// normal asymmetry as healthy (cedar); everything else stays quiet.
 const SIG_TONE = {
   under_invoicing: "burgundy",
-  smuggling_risk: "gold",
   over_invoicing: "neutral",
+  not_in_partner: "neutral",
   value_gap: "neutral",
   normal: "cedar",
   exempt: "neutral",
@@ -39,7 +39,7 @@ export default function GapForensics({ data, onOpenProducts, yearControl }) {
   const rows = useMemo(
     () =>
       corridors.filter((c) => {
-        if (signature === "flagged" && (c.signature === "normal" || c.signature === "exempt" || c.signature === "structural")) return false;
+        if (signature === "flagged" && ["normal", "exempt", "structural", "not_in_partner"].includes(c.signature)) return false;
         if (signature !== "all" && signature !== "flagged" && c.signature !== signature)
           return false;
         if (chapter !== "all" && c.hs2 !== chapter) return false;
@@ -49,9 +49,10 @@ export default function GapForensics({ data, onOpenProducts, yearControl }) {
   );
 
   const silentPartners = meta.reporters.filter((r) => !r.has_data);
-  const flaggedCount = corridors.filter((c) => !["normal", "exempt", "structural"].includes(c.signature)).length;
+  const flaggedCount = corridors.filter((c) => !["normal", "exempt", "structural", "not_in_partner"].includes(c.signature)).length;
   const exemptCount = corridors.filter((c) => c.signature === "exempt").length;
   const structuralCount = corridors.filter((c) => c.signature === "structural").length;
+  const notInPartnerCount = corridors.filter((c) => c.signature === "not_in_partner").length;
   const shown = rows.slice(0, limit);
   const subtotal = rows.reduce((s, r) => s + Math.max(0, r.vat_floor), 0);
 
@@ -69,9 +70,9 @@ export default function GapForensics({ data, onOpenProducts, yearControl }) {
           options={[
             ["flagged", `All flagged (${flaggedCount})`],
             ["under_invoicing", `Under-invoicing (${sig.under_invoicing})`],
-            ["smuggling_risk", `Smuggling risk (${sig.smuggling_risk})`],
             ["over_invoicing", `Over-invoicing (${sig.over_invoicing})`],
-            ["value_gap", `Unclassified gap (${sig.value_gap})`],
+            ["value_gap", `Largely unrecorded (${sig.value_gap})`],
+            ["not_in_partner", `Only in Lebanon's books (${notInPartnerCount})`],
             ["exempt", `Exempt regime (${exemptCount})`],
             ["structural", `Set aside · one-sided (${structuralCount})`],
             ["all", `Everything incl. normal (${corridors.length})`],

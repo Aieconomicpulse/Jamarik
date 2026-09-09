@@ -13,6 +13,9 @@ const AXIS = "#7c7563";
 const GRID = "rgba(222,217,202,0.9)";
 
 // Cover bands, low to high. Colour carries the reading; the label carries it too.
+// Evidence rung → chip colour: the more tests a corridor passes, the warmer.
+const RUNG_TONE = { strong: "burgundy", probable: "gold", verify: "neutral" };
+
 const BANDS = [
   { lo: 0.0, hi: 0.2, label: "0–20%", fill: "#1f6bc4", reading: "unrecorded" },
   { lo: 0.2, hi: 0.4, label: "20–40%", fill: "#1f6bc4", reading: "unrecorded" },
@@ -176,7 +179,7 @@ export default function Analytics({ data, year, onOpenProducts, onOpenLedger, ye
 
       {/* What to open first */}
       <Panel>
-        <PanelHead title="Open these first" sub="Ranked by revenue at stake × strength of signal · click a row for its products"
+        <PanelHead title="Open these first" sub="Under-declared corridors ranked by expected recoverable · click a row for its products"
           right={onOpenLedger && (
             <button onClick={onOpenLedger} className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[11px] uppercase tracking-wider num text-slate1 hover:text-ink hover:bg-bone2 cursor-pointer transition-colors">
               Full ledger →
@@ -189,8 +192,8 @@ export default function Analytics({ data, year, onOpenProducts, onOpenLedger, ye
                 <th>#</th><th>Partner</th><th>Heading</th><th>Product</th>
                 <th className="text-right">Partner (CIF-adj.)</th><th className="text-right">Lebanon</th>
                 <th className="text-right">Recorded</th><th>Reading</th>
-                <th className="text-right">Revenue lost</th><th className="text-right">Signal</th>
-                {meta.years?.length > 1 && <th>Repeat</th>}
+                <th className="text-right">Revenue lost</th><th className="text-right">Estimated</th>
+                <th>Rung</th><th>Why</th>
               </tr>
             </thead>
             <tbody>
@@ -206,18 +209,17 @@ export default function Analytics({ data, year, onOpenProducts, onOpenLedger, ye
                   <td className="text-right num">{money(c.m)}</td>
                   <td className="text-right num">{Math.round(c.cover * 100)}%</td>
                   <td><Chip tone={SIG_TONE[c.signature]}>{meta.signatures?.[c.signature] ?? c.signature}</Chip></td>
-                  <td className="text-right num text-gold">{money(c.fiscal_loss)}</td>
-                  <td className="text-right num">{c.signal}</td>
-                  {meta.years?.length > 1 && (
-                    <td>{c.persistent ? <Chip tone="burgundy">both years</Chip> : <span className="text-slate2 text-[12px]">—</span>}</td>
-                  )}
+                  <td className="text-right num text-slate1">{money(c.fiscal_loss)}</td>
+                  <td className="text-right num text-gold">{money(c.fiscal_loss * (c.p_real ?? 0))}</td>
+                  <td><Chip tone={RUNG_TONE[c.rung.level]}>{c.rung.level}</Chip></td>
+                  <td className="text-[12px] text-slate1 leading-snug max-w-[360px]">{c.rung.tests.join(" · ")}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <div className="px-5 py-3 border-t border-rule text-[11.5px] text-slate2">
-          Under-declared corridors only — the strongest claim. Unrecorded ones are listed in the ledger under their own reading.
+          Ranked by expected recoverable = corrected loss × collectability (0.5 until calibrated). Under-declared corridors only — the strongest claim; unrecorded ones are listed in the ledger under their own reading.
         </div>
       </Panel>
     </div>

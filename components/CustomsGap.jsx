@@ -59,7 +59,6 @@ export default function CustomsGap({ gaps, stamp }) {
         value_gap: s.unrecorded.count,
         over_invoicing: s.over.count,
         normal: s.normal,
-        smuggling_risk: 0,
       },
     };
   }, [scope, meta, gaps.years, year, years]);

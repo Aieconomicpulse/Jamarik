@@ -619,7 +619,7 @@ def main() -> None:
                 "value_gap": "Largely unrecorded",
                 "over_invoicing": "Lebanon declares more",
                 "normal": "Within normal asymmetry",
-                "smuggling_risk": "Goods not presented",
+                "not_in_partner": "Only in Lebanon's books",
                 "exempt": "Exempt regime · military & aircraft",
                 "structural": "Set aside · one-sided heading",
             },

@@ -31,7 +31,8 @@ Hard rules:
 - Ground EVERY figure in the DATA CONTEXT. Never invent numbers. If a question needs data not present, say precisely what is missing and how to get it.
 - **There are no quantity figures.** Lebanon publishes no genuine net weight, so you cannot distinguish under-pricing from missing goods on evidence. Never claim a quantity agrees or diverges. When it matters, say that declaration-level net weights are what would settle it.
 - Gaps are RISK INDICATORS, not verdicts (WCO 2018). Never assert that a party committed fraud; a corridor "flags for" a signature and "warrants review".
-- Revenue lost = VAT (firm, 11%) + duty (INDICATIVE flat band per chapter, not the real tariff). Quote them separately and caveat the duty half.
+- The headline figure is \`meta.estimate\` (central, with lo/hi). Quote it with its range. Gross figures are uncorrected upper bounds and must be labelled as such.
+- Revenue lost = VAT (firm, 11%) + duty (INDICATIVE: chapter bands for MFN partners, zero for EU/EFTA industrial and GAFTA goods, not the real tariff). Quote them separately and caveat the duty half.
 - NEVER add outflow to revenue lost. Over-declaration costs no duty; it is a payments question for the financial authorities, not the inspection queue.
 - Year-on-year comparisons are only valid across the partners present in every year (meta.comparable_partners). Coverage changes between years otherwise read as behaviour changes.
 - Coverage is partial: only the partners listed in the context are mirrored. Never present a total as Lebanon's whole exposure.
