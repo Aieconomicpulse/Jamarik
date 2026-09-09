@@ -24,8 +24,8 @@
     "name": "United States"
    }
   ],
-  "generated": "2026-09-08",
-  "retrieved": "2026-09-08T10:03:16.335641+00:00",
+  "generated": "2026-09-09",
+  "retrieved": "2026-09-09T06:32:39.512559+00:00",
   "source": "UN Comtrade bulk FINAL files (comtradeapi.un.org)",
   "coverage": "PARTIAL \u2014 only the partners listed per year are mirrored",
   "cif_factor": 1.05,
@@ -436,8 +436,8 @@
      "set_aside_hs4": [],
      "rx": 0,
      "exempt_gap": 35674.4,
-     "fiscal": 4866832.16,
-     "fiscal_absent": 1012305.16
+     "fiscal": 3616581.37,
+     "fiscal_absent": 530255.08
     },
     {
      "year": 2023,
@@ -452,8 +452,8 @@
      "set_aside_hs4": [],
      "rx": 1271616.22,
      "exempt_gap": 1671967.63,
-     "fiscal": 24872105.71,
-     "fiscal_absent": 1090502.93
+     "fiscal": 14438509.86,
+     "fiscal_absent": 868530.65
     },
     {
      "year": 2023,
@@ -470,8 +470,8 @@
      ],
      "rx": 1107279677.44,
      "exempt_gap": 0,
-     "fiscal": 25530774.85,
-     "fiscal_absent": 970450.29
+     "fiscal": 17985146.01,
+     "fiscal_absent": 527470.66
     },
     {
      "year": 2023,
@@ -518,8 +518,8 @@
      "set_aside_hs4": [],
      "rx": 0,
      "exempt_gap": 27.28,
-     "fiscal": 5335651.19,
-     "fiscal_absent": 1395970.17
+     "fiscal": 3828685.81,
+     "fiscal_absent": 731222.47
     },
     {
      "year": 2024,
@@ -534,8 +534,8 @@
      "set_aside_hs4": [],
      "rx": 881287.16,
      "exempt_gap": 2149410.62,
-     "fiscal": 23468035.73,
-     "fiscal_absent": 1575516.38
+     "fiscal": 14294217.31,
+     "fiscal_absent": 1323996.71
     },
     {
      "year": 2024,
@@ -552,8 +552,8 @@
      ],
      "rx": 1179505.57,
      "exempt_gap": 0,
-     "fiscal": 7109742.02,
-     "fiscal_absent": 1069517.82
+     "fiscal": 4563521.31,
+     "fiscal_absent": 628737.61
     },
     {
      "year": 2024,
@@ -578,7 +578,7 @@
   "hs_table": "UNSD HS2022toHS2017ConversionAndCorrelationTables.xlsx",
   "quantity_available": false,
   "quantity_note": "Lebanon publishes no genuine net weight to Comtrade \u2014 every non-zero weight on its import rows is a UN estimate. Under-pricing therefore cannot be separated from missing goods on public data; declaration-level weights (NAJM) are what would settle it.",
-  "duty_note": "Duty is INDICATIVE, applied as a flat band per HS chapter. It ignores excise, exemptions and free-trade preferences. Verify against the Lebanese tariff schedule before citing any duty figure.",
+  "duty_note": "Duty is indicative: chapter bands for MFN partners; zero for EU/EFTA industrial goods (chapters 25\u201397) and GAFTA goods; excise chapters (22, 24, 27, 87) always charged. Verify against the Lebanese tariff before citing a duty figure.",
   "estimate": {
    "method": "reflected_tail",
    "note": "Noise between two customs services is symmetric in log(cover); under-declaration is not. For each partner-year and band, the corridors in the band's mirror image (cover in (1/hi, 1/lo]) count how many the noise alone would produce; the share explained by noise is n_mirror/n_band, and p_real = 1 - that share is applied to each corridor's fiscal loss. 'central' is the sum; 'lo'/'hi' are a 90% bootstrap interval over corridors; 'floor' is net shortfall x effective rate; 'gross' is the uncorrected sum. Over-declaration inflates the noise estimate, so 'central' is conservative.",
@@ -593,7 +593,7 @@
     ]
    },
    "bootstrap_draws": 400,
-   "computed": "2026-09-08",
+   "computed": "2026-09-09",
    "years": {
     "2023": {
      "gross": 212700680.71,
@@ -798,7 +798,7 @@
    }
   },
   "corridor_rule": "A heading is a corridor when either side reaches $250,000 (CIF); Lebanon-only headings read not_in_partner and carry no shortfall.",
-  "postprocessed": "2026-09-08"
+  "postprocessed": "2026-09-09"
  },
  "years": {
   "2023": {

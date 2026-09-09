@@ -134,7 +134,7 @@ renumbering), `merged` (several HS 2022 codes pooled into one HS 2017 code),
 `split` (the HS 2022 code could sit under more than one HS 2017 code; the
 table's convention was applied), or `unmapped`. Nothing is paired by prefix.
 
-Three further rules keep the gap honest:
+Further rules keep the gap honest:
 
 - **Partner figure = domestic exports.** Lebanon books imports by country of
   origin, so a partner's re-exports never appear under that partner. The
@@ -151,6 +151,12 @@ Three further rules keep the gap honest:
   (Saudi fuel reported to no destination; UAE diamonds that are re-exports)
   rather than a customs gap. Both thresholds are constants in the pipeline
   and in the metadata.
+- **Duty follows the preference regime.** Chapter bands apply to MFN partners
+  (China, the United States); EU and EFTA industrial goods (chapters 25–97) and
+  GAFTA goods carry zero duty; excise chapters (22, 24, 27, 87) are charged
+  whatever the origin. `pipeline/tariff.py` holds the rule; each corridor
+  carries its `preference`. Verify against the Lebanese tariff before citing a
+  duty figure.
 - **Attribution test.** Every line carries `lw`, Lebanon's imports of the
   HS-4 heading from every origin. When that is below what one partner alone
   says it sent, the goods are absent from Lebanon's books under any origin —

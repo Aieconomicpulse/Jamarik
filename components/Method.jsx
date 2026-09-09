@@ -64,6 +64,7 @@ export default function Method({ meta, stamp }) {
           <Row k="Source">{meta.source}. Both sides are public and independently checkable.</Row>
           <Row k="VAT">{Math.round(meta.vat_rate * 100)}% of the shortfall — the firm half of the revenue figure.</Row>
           <Row k="Duty">{meta.duty_note}</Row>
+          <Row k="Preferences">EU and EFTA industrial goods (chapters 25–97) enter duty-free under the Euro-Mediterranean Association Agreement and the EFTA agreement, and goods of Arab origin under GAFTA, so no duty is booked on those corridors; excise chapters (22, 24, 27, 87) are charged whatever the origin. Each corridor carries its regime.</Row>
           <Row k="CIF factor">{meta.cif_basis}</Row>
           <Row k="Quantities">{meta.quantity_note}</Row>
           <Row k="Coverage">{meta.coverage}. Corridors below $250,000 and confidentiality buckets are excluded. Year-on-year comparisons use only partners present in every year.</Row>

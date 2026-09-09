@@ -35,6 +35,7 @@ table cannot place stays one-sided and is labelled as such.
 from __future__ import annotations
 
 import argparse
+import sys
 import json
 import re
 from collections import defaultdict
@@ -87,22 +88,6 @@ OVER_RATIO = 1.60
 # with higher bands on finished consumer goods and vehicles. These are ORDER OF
 # MAGNITUDE ONLY and are labelled as such everywhere they surface — the real
 # schedule carries excise, exemptions and free-trade preferences this cannot see.
-DUTY_BANDS = {
-    "default": 0.05,
-    0.00: ["10", "27", "29", "30", "31", "47", "72", "84", "85", "90"],   # inputs, fuel, pharma, machinery
-    0.10: ["17", "19", "20", "21", "32", "33", "34", "39", "48", "69", "70", "73", "76", "83", "94", "96"],
-    0.20: ["22", "42", "61", "62", "63", "64", "65", "66", "87", "91", "95"],  # finished consumer goods
-    0.35: ["24"],                                                          # tobacco, before excise
-}
-
-
-def duty_rate(hs2: str) -> float:
-    for rate, chapters in DUTY_BANDS.items():
-        if rate != "default" and hs2 in chapters:
-            return rate
-    return DUTY_BANDS["default"]
-
-
 CHAPTERS = {
     "01": "Live animals", "02": "Meat", "03": "Fish & seafood", "04": "Dairy & eggs",
     "05": "Animal products", "06": "Live plants & flowers", "07": "Vegetables",
@@ -148,6 +133,9 @@ COUNTRY = {
 # --------------------------------------------------------------------------- #
 # HS edition concordance                                                       #
 # --------------------------------------------------------------------------- #
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from tariff import duty_rate_for, preference  # noqa: E402
 
 HS_TABLE = Path(__file__).resolve().parent / "hs" / "HS2022toHS2017.xlsx"
 
@@ -396,7 +384,7 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
         share = structural_share(x_cif, r.m, total_x, total_m)
         sig = "structural" if share else ("exempt" if is_exempt(r.hs4) else classify(cover))
         hs2 = r.hs4[:2]
-        rate = duty_rate(hs2)
+        rate = duty_rate_for(r.hs4, code)
         m_world = float(world4.get(r.hs4, 0.0))
 
         # Fiscal loss only where Lebanon declared LESS. Over-declaration is not a
@@ -434,6 +422,7 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
             "duty_loss": round(shortfall * rate, 2),
             "fiscal_loss": round(shortfall * (VAT_RATE + rate), 2),
             "confidence": "medium" if r.x_fob > 1e6 else "low",
+            "preference": preference(code),
             "hub": code in HUBS,
         })
     return out
@@ -662,9 +651,9 @@ def main() -> None:
                 "weights (NAJM) are what would settle it."
             ),
             "duty_note": (
-                "Duty is INDICATIVE, applied as a flat band per HS chapter. It ignores "
-                "excise, exemptions and free-trade preferences. Verify against the "
-                "Lebanese tariff schedule before citing any duty figure."
+                "Duty is indicative: chapter bands for MFN partners; zero for EU/EFTA industrial goods "
+                "(chapters 25–97) and GAFTA goods; excise chapters (22, 24, 27, 87) always charged. "
+                "Verify against the Lebanese tariff before citing a duty figure."
             ),
         },
         "years": per_year,
@@ -724,7 +713,7 @@ def _row(code, status, m, x_fob, kg, lc, pc, year, partner, src, kind, rx, lw):
         "g": round(gap, 2), "cv": None if cover is None else round(cover, 3),
         "rd": reading,
         "vat": round(gap * VAT_RATE, 2) if gap > 0 and reading != "exempt" else 0.0,
-        "duty": round(gap * duty_rate(hs2), 2) if gap > 0 and reading != "exempt" else 0.0,
+        "duty": round(gap * duty_rate_for(code[:4], partner), 2) if gap > 0 and reading != "exempt" else 0.0,
         "kg": round(kg, 1) if kg else None,
         "lv": lc, "pv": pc,
         # What the partner actually reported (HS 2022) and how it was placed.
