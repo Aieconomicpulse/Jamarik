@@ -17,18 +17,18 @@ import { Icon, Segmented, Skeleton } from "@/components/ui";
 // The Detective stays available behind a flag: NEXT_PUBLIC_DETECTIVE=off hides it.
 const DETECTIVE = process.env.NEXT_PUBLIC_DETECTIVE !== "off";
 const TABS = [
-  ["worklist", "Worklist", "tasks"],
   ["products", "Products", "package"],
   ["analytics", "Corridors", "chart"],
   ["ledger", "Evidence", "table"],
   ...(DETECTIVE ? [["detective", "Detective", "search"]] : []),
   ["method", "Method", "book"],
+  ["worklist", "Worklist", "tasks"],
 ];
 
 export default function CustomsGap({ gaps, stamp }) {
   const { meta } = gaps;
   const years = meta.years || [];
-  const [tab, setTab] = useState("worklist");
+  const [tab, setTab] = useState("products");
   const [year, setYear] = useState(String(meta.base_year ?? years[years.length - 1]));
   const [focus, setFocus] = useState(null);
 
@@ -88,7 +88,7 @@ export default function CustomsGap({ gaps, stamp }) {
 
       {/* Sections. The selected one is filled gold; the rest wait quietly. */}
       <nav aria-label="Sections" className="mb-8 -mx-5 px-5 lg:mx-0 lg:px-0 overflow-x-auto">
-        <div role="tablist" className="inline-flex gap-1 p-1 rounded-xl bg-bone2 border border-rule">
+        <div role="tablist" className="inline-flex gap-2 p-1.5 rounded-2xl bg-bone2 border border-rule">
           {TABS.map(([key, label, icon]) => {
             const on = tab === key;
             return (
@@ -97,13 +97,13 @@ export default function CustomsGap({ gaps, stamp }) {
                 role="tab"
                 aria-selected={on}
                 onClick={() => setTab(key)}
-                className={`inline-flex items-center gap-2.5 h-11 px-4 md:px-5 rounded-lg text-[14px] md:text-[15px] font-medium tracking-wide cursor-pointer whitespace-nowrap transition-colors duration-150 ${
+                className={`flex flex-col items-center justify-center gap-1.5 w-24 h-24 md:w-28 md:h-28 rounded-xl text-[13px] md:text-[14px] font-medium tracking-wide cursor-pointer whitespace-nowrap transition-colors duration-150 ${
                   on
                     ? "bg-gold text-white shadow-sm"
                     : "text-slate1 hover:text-ink hover:bg-bone"
                 }`}
               >
-                <Icon name={icon} className="w-[18px] h-[18px]" />
+                <Icon name={icon} className="w-8 h-8 md:w-9 md:h-9" strokeWidth={1.6} />
                 {label}
               </button>
             );

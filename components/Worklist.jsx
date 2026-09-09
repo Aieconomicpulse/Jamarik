@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { money } from "@/lib/format";
-import { Button, Chip, Panel, PanelHead, Skeleton } from "@/components/ui";
+import { Button, Chip, Panel, PanelHead, Select, Skeleton } from "@/components/ui";
 
 // The action surface: the corridors to open first, each with its evidence
 // rung, the tests behind it, and a status an officer can set. Statuses live
@@ -16,15 +16,28 @@ export default function Worklist({ year, yearControl, onOpenProducts }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState({});
+  const [avail, setAvail] = useState(null);
+  const [partner, setPartner] = useState("all");
+
+  // Which countries are mirrored, so the filter is never a guess.
+  useEffect(() => {
+    fetch("/api/mirror", { cache: "no-store" }).then((r) => r.json()).then(setAvail).catch(() => {});
+  }, []);
+  const partnersForYear = year && year !== "all" ? avail?.partners?.[year] || [] : [];
+  useEffect(() => {
+    if (partner !== "all" && partnersForYear.length && !partnersForYear.some((p) => String(p.code) === partner)) {
+      setPartner("all");
+    }
+  }, [partnersForYear, partner]);
 
   const load = useCallback(() => {
     if (!year || year === "all") return;
     setData(null); setError(null);
-    fetch(`/api/worklist?year=${year}`, { cache: "no-store" })
+    fetch(`/api/worklist?year=${year}&partner=${partner}`, { cache: "no-store" })
       .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || r.statusText); return r.json(); })
       .then(setData)
       .catch((e) => setError(e.message));
-  }, [year]);
+  }, [year, partner]);
   useEffect(() => { load(); }, [load]);
 
   async function save(item, patch) {
@@ -67,6 +80,16 @@ export default function Worklist({ year, yearControl, onOpenProducts }) {
     <div className="fade-in">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-5">
         {yearControl && <div className="flex items-center gap-3"><span className="eyebrow">Year</span>{yearControl}</div>}
+        <div className="flex items-center gap-3">
+          <span className="eyebrow">Country</span>
+          <Select
+            label="Country"
+            value={partner}
+            onChange={setPartner}
+            options={[["all", "All countries"], ...partnersForYear.map((p) => [String(p.code), p.name])]}
+            className="w-44"
+          />
+        </div>
         {data && (
           <div className="text-[12.5px] text-slate1 num">
             {data.items.length} corridors · {counts.review || 0} in review · {counts.audited || 0} audited · {counts.recovered || 0} recovered · <span className="text-ink">{money(recovered)}</span> recovered so far
@@ -88,7 +111,12 @@ export default function Worklist({ year, yearControl, onOpenProducts }) {
 
       {data && (
         <Panel>
-          <PanelHead title="Open these first" sub="Flagged corridors ranked by expected recoverable = corrected loss × collectability (0.5 until calibrated) · click a heading for its products" />
+          <PanelHead
+            title={partner === "all" ? "Open these first" : `Every product to recover from ${partnersForYear.find((p) => String(p.code) === partner)?.name ?? "this country"}`}
+            sub={partner === "all"
+              ? "Flagged corridors ranked by expected recoverable = corrected loss × collectability (0.5 until calibrated) · click a heading for its products"
+              : "Every flagged heading for this country, not just the top ones · ranked by expected recoverable · click a heading for its products"}
+          />
           <div className="overflow-x-auto">
             <table className="dt [&_td]:px-3 [&_th]:px-3">
               <thead>

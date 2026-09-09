@@ -5,7 +5,8 @@ import { itemId, statusesFor } from "@/lib/db";
 
 // The worklist: flagged corridors for one year, ranked by expected recoverable,
 // each joined with whatever status an officer has given it. Corridors without
-// a stored row are "new".
+// a stored row are "new". With ?partner=, the list is that country's complete
+// set of products to recover — every flagged heading, not just the top ones.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,11 +14,17 @@ export const dynamic = "force-dynamic";
 export async function GET(req) {
   const url = new URL(req.url);
   const year = Number(url.searchParams.get("year")) || null;
-  const limit = Math.min(200, Number(url.searchParams.get("limit")) || 60);
+  const partner = url.searchParams.get("partner");
+  const hasPartner = partner && partner !== "all";
+  // One country: no cap — every product it owes on. All countries: top N by
+  // expected recoverable, the triage queue.
+  const limit = Math.min(2000, Number(url.searchParams.get("limit")) || (hasPartner ? 2000 : 60));
   if (!year) return Response.json({ error: "year is required" }, { status: 400 });
 
   const gaps = await loadGaps();
-  const t = triage(sliceFor(gaps, year).corridors);
+  let corridors = sliceFor(gaps, year).corridors;
+  if (hasPartner) corridors = corridors.filter((c) => c.partner === Number(partner));
+  const t = triage(corridors);
   const ranked = [...t.recoverable, ...t.checkOrigin].sort((a, b) => b.expected - a.expected).slice(0, limit);
   const status = await statusesFor(year);
 
