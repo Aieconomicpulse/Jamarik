@@ -45,9 +45,13 @@ from pathlib import Path
 import pandas as pd
 
 LEBANON = 422
-VAT_RATE = 0.11
-CIF_FACTOR = 1.05          # documented constant — see note in meta
-MIN_PARTNER_VALUE = 250_000
+# Every threshold the build and the UI share lives in config/thresholds.json,
+# read once here and imported by lib/losses.js, so the two cannot drift.
+_T = json.loads((Path(__file__).resolve().parents[1] / "config" / "thresholds.json").read_text())
+VAT_RATE = _T["vat_rate"]
+CIF_FACTOR = _T["cif_factor"]          # documented constant — see note in meta
+MIN_PARTNER_VALUE = _T["min_corridor_value"]
+ABSENT_RATIO = _T["absent_ratio"]      # Lebanon's all-origin imports below this share of one partner's figure = absent
 EXCLUDED_HS4 = {"9999", "9880"}
 
 # Goods that enter under an exemption regime rather than as a commercial import:
@@ -70,8 +74,8 @@ def is_exempt(code: str) -> bool:
 # as UAE-origin that the UAE only re-exported. Such a heading would dominate
 # every total for that corridor, so it is set aside from all of them and shown
 # on its own.
-STRUCTURAL_SHARE = 0.25
-ONE_SIDED = 0.05
+STRUCTURAL_SHARE = _T["structural_share"]
+ONE_SIDED = _T["one_sided"]
 
 
 def structural_share(x: float, m: float, total_x: float, total_m: float):
@@ -81,8 +85,8 @@ def structural_share(x: float, m: float, total_x: float, total_m: float):
         return x / total_x
     return None
 
-UNDER_LO, UNDER_HI = 0.40, 0.85
-OVER_RATIO = 1.60
+UNDER_LO, UNDER_HI = _T["under_lo"], _T["under_hi"]
+OVER_RATIO = _T["over"]
 
 # Indicative duty rates by HS chapter. Lebanon's applied tariff is mostly 0-5%
 # with higher bands on finished consumer goods and vehicles. These are ORDER OF
@@ -412,7 +416,7 @@ def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
             "partner_kg": round(r.x_kg, 1) if r.x_kg else None,
             "rx": round(r.rx, 2) if r.rx == r.rx else None,   # re-exports through the partner, FOB
             "m_world": round(m_world, 2),                     # Lebanon's imports of the heading from every origin
-            "absent": bool(x_cif > 0 and m_world < 0.85 * x_cif),
+            "absent": bool(x_cif > 0 and m_world < ABSENT_RATIO * x_cif),
             "share": round(share, 3) if share else None,   # of the corridor, when set aside as one-sided
             "signature": sig,
             "shortfall": round(shortfall, 2),
@@ -629,6 +633,8 @@ def main() -> None:
                 "total and shown on its own: it is a reporting-practice question, not a customs gap."
             ),
             "structural_share": STRUCTURAL_SHARE,
+            "absent_ratio": ABSENT_RATIO,
+            "thresholds_file": "config/thresholds.json",
             "partner_basis": (
                 "Lebanon books imports by country of origin, so a partner's re-exports never "
                 "appear under that partner. The partner figure is domestic exports (DX) where "

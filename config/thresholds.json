@@ -1,0 +1,2 @@
+{ "cif_factor": 1.05, "vat_rate": 0.11, "under_lo": 0.40, "under_hi": 0.85, "over": 1.60,
+  "structural_share": 0.25, "one_sided": 0.05, "min_corridor_value": 250000, "absent_ratio": 0.85 }

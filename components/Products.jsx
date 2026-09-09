@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { money } from "@/lib/format";
-import { LOSS_BY_KEY, REVENUE_READINGS, classifyCover } from "@/lib/losses";
+import { ABSENT_RATIO, LOSS_BY_KEY, REVENUE_READINGS, classifyCover } from "@/lib/losses";
 import { Bar, Button, Chip, Icon, Input, Panel, Segmented, Select, Skeleton, Tile } from "@/components/ui";
 
 // Product by product. What the partner says it exported to Lebanon, what
@@ -192,7 +192,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
   const chapterBalances = (r) => lvl !== 2 && r.g > 0 && REVENUE_READINGS.has(r.rd) && (byChapter.get(r.hs2)?.g ?? 1) <= 0;
   // Lebanon books less of this heading from the whole world than this partner
   // alone says it sent: the goods are not in Lebanon's records under any origin.
-  const absent = (r) => r.g > 0 && REVENUE_READINGS.has(r.rd) && r.lw < 0.85 * r.xc;
+  const absent = (r) => r.g > 0 && REVENUE_READINGS.has(r.rd) && r.lw < ABSENT_RATIO * r.xc;
   const basis = BASIS[data?.basis] || null;
   const est = data?.estimate && data.estimate.central != null ? data.estimate : null;
 
