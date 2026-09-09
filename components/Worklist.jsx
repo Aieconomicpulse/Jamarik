@@ -90,53 +90,56 @@ export default function Worklist({ year, yearControl, onOpenProducts }) {
         <Panel>
           <PanelHead title="Open these first" sub="Flagged corridors ranked by expected recoverable = corrected loss × collectability (0.5 until calibrated) · click a heading for its products" />
           <div className="overflow-x-auto">
-            <table className="dt">
+            <table className="dt [&_td]:px-3 [&_th]:px-3">
               <thead>
                 <tr>
-                  <th>#</th><th>Partner</th><th>Heading</th>
-                  <th className="text-right">Partner (CIF)</th><th className="text-right">Lebanon</th>
+                  <th>#</th><th>Partner</th><th>Heading · rung · why it is here</th>
+                  <th className="text-right" title="Partner CIF-adjusted → Lebanon registered · cover">Partner → Lebanon</th>
                   <th className="text-right" title="Partner FOB ÷ partner net weight">Unit value</th>
-                  <th>Reading</th><th className="text-right">Estimated</th><th className="text-right">Expected</th>
-                  <th>Rung</th><th>Why</th><th>Status</th><th className="text-right">Recovered</th><th>Note</th>
+                  <th>Reading</th><th className="text-right" title="Gross loss × share surviving the noise correction">Estimated</th>
+                  <th className="text-right" title="Estimated × collectability (0.5)">Expected</th>
+                  <th>Status · recovered · note</th>
                 </tr>
               </thead>
               <tbody>
                 {data.items.map((c) => (
                   <tr key={c.id}>
-                    <td className="num text-slate2">{String(c.rank).padStart(2, "0")}</td>
-                    <td className="whitespace-nowrap">{c.partnerName}</td>
-                    <td>
-                      <button onClick={() => onOpenProducts?.({ partner: c.partner, chapter: c.hs4.slice(0, 2), hs4: c.hs4 })}
-                        className="text-left cursor-pointer group" title="Open this heading product by product">
-                        <div className="num text-[12px] text-slate1 group-hover:text-gold transition-colors">HS {c.hs4}</div>
-                        <div className="text-[13px] leading-snug max-w-[200px]">{c.chapter}</div>
-                      </button>
+                    <td className="num text-slate2 align-top pt-4">{String(c.rank).padStart(2, "0")}</td>
+                    <td className="whitespace-nowrap align-top pt-4">{c.partnerName}</td>
+                    <td className="align-top min-w-[280px] max-w-[380px]">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button onClick={() => onOpenProducts?.({ partner: c.partner, chapter: c.hs4.slice(0, 2), hs4: c.hs4 })}
+                          className="text-left cursor-pointer group" title="Open this heading product by product">
+                          <span className="num text-[12px] text-slate1 group-hover:text-gold transition-colors">HS {c.hs4}</span>{" "}
+                          <span className="text-[13px] text-ink">{c.chapter}</span>
+                        </button>
+                        <Chip tone={RUNG_TONE[c.rung]}>{c.rung}</Chip>
+                      </div>
+                      <div className="text-[11.5px] text-slate1 leading-snug mt-1">{c.tests.join(" · ")}</div>
                     </td>
-                    <td className="text-right num">{money(c.x_cif)}</td>
-                    <td className="text-right num">{money(c.m)} <span className="text-slate2 text-[11px]">{c.cover == null ? "" : `${Math.round(c.cover * 100)}%`}</span></td>
-                    <td className="text-right num">{c.unit_value ? `$${c.unit_value.toFixed(2)}/kg` : <span className="text-slate2">—</span>}</td>
-                    <td><Chip tone={SIG_TONE[c.signature] || "neutral"}>{data.signatures?.[c.signature] ?? c.signature}</Chip></td>
-                    <td className="text-right num text-gold" title={`gross ${money(c.fiscal_loss)}`}>{money(c.estimated)}</td>
-                    <td className="text-right num">{money(c.expected)}</td>
-                    <td><Chip tone={RUNG_TONE[c.rung]}>{c.rung}</Chip></td>
-                    <td className="text-[11.5px] text-slate1 leading-snug max-w-[260px]">{c.tests.join(" · ")}</td>
-                    <td>
+                    <td className="text-right num whitespace-nowrap align-top pt-4">
+                      {money(c.x_cif)} <span className="text-slate2">→</span> {money(c.m)}
+                      <div className="text-slate2 text-[11px]">{c.cover == null ? "" : `${Math.round(c.cover * 100)}% recorded`}</div>
+                    </td>
+                    <td className="text-right num whitespace-nowrap align-top pt-4">{c.unit_value ? `$${c.unit_value.toFixed(2)}/kg` : <span className="text-slate2">—</span>}</td>
+                    <td className="align-top pt-3.5"><Chip tone={SIG_TONE[c.signature] || "neutral"}>{data.signatures?.[c.signature] ?? c.signature}</Chip></td>
+                    <td className="text-right num whitespace-nowrap text-gold align-top pt-4" title={`gross ${money(c.fiscal_loss)}`}>{money(c.estimated)}</td>
+                    <td className="text-right num whitespace-nowrap align-top pt-4">{money(c.expected)}</td>
+                    <td className="align-top min-w-[180px]">
                       <select value={c.status} onChange={(e) => save(c, { status: e.target.value })} aria-label={`Status for HS ${c.hs4}`}
-                        className="h-9 pl-2 pr-7 rounded-md bg-bone border border-rule text-[12.5px] num cursor-pointer focus:outline-none focus:border-gold">
+                        className="h-9 w-full pl-2 pr-7 rounded-md bg-bone border border-rule text-[12.5px] num cursor-pointer focus:outline-none focus:border-gold">
                         {STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
+                      <div className="flex gap-1.5 mt-1.5">
+                        <input type="number" min="0" step="1000" defaultValue={c.recovered_usd ?? ""} placeholder="recovered $"
+                          aria-label={`Recovered for HS ${c.hs4}`}
+                          onBlur={(e) => { const v = e.target.value; if ((v === "" ? null : Number(v)) !== (c.recovered_usd ?? null)) save(c, { recovered_usd: v === "" ? null : Number(v) }); }}
+                          className="h-8 w-[104px] px-2 rounded-md bg-bone border border-rule text-[12px] num text-right placeholder:text-slate2 focus:outline-none focus:border-gold" />
+                        <input type="text" defaultValue={c.note ?? ""} placeholder="note" aria-label={`Note for HS ${c.hs4}`}
+                          onBlur={(e) => { if (e.target.value !== (c.note ?? "")) save(c, { note: e.target.value }); }}
+                          className="h-8 flex-1 min-w-[80px] px-2 rounded-md bg-bone border border-rule text-[12px] placeholder:text-slate2 focus:outline-none focus:border-gold" />
+                      </div>
                       {saving[c.id] && <div className={`text-[10.5px] num mt-1 ${String(saving[c.id]).startsWith("error") ? "text-burgundy" : "text-cedar"}`}>{saving[c.id]}</div>}
-                    </td>
-                    <td className="text-right">
-                      <input type="number" min="0" step="1000" defaultValue={c.recovered_usd ?? ""} placeholder="$"
-                        aria-label={`Recovered for HS ${c.hs4}`}
-                        onBlur={(e) => { const v = e.target.value; if ((v === "" ? null : Number(v)) !== (c.recovered_usd ?? null)) save(c, { recovered_usd: v === "" ? null : Number(v) }); }}
-                        className="h-9 w-28 px-2 rounded-md bg-bone border border-rule text-[12.5px] num text-right focus:outline-none focus:border-gold" />
-                    </td>
-                    <td>
-                      <input type="text" defaultValue={c.note ?? ""} placeholder="note" aria-label={`Note for HS ${c.hs4}`}
-                        onBlur={(e) => { if (e.target.value !== (c.note ?? "")) save(c, { note: e.target.value }); }}
-                        className="h-9 w-40 px-2 rounded-md bg-bone border border-rule text-[12.5px] focus:outline-none focus:border-gold" />
                     </td>
                   </tr>
                 ))}

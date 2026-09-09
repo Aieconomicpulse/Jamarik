@@ -33,6 +33,8 @@ test("screen figures equal the API estimate", async ({ page }) => {
   await login(page);
 
   // Products, China, 2024 → tile 4 is the partner estimate.
+  await page.click('[role=tab]:has-text("Products")');
+  await page.locator('select[aria-label="Year"]').waitFor({ timeout: 60_000 });
   await page.selectOption('select[aria-label="Year"]', "2024");
   await page.selectOption('select[aria-label="Partner"]', "156");
   await expect(page.locator("p").filter({ hasText: /an estimated/ }).first()).toBeVisible({ timeout: 30_000 });
@@ -41,7 +43,7 @@ test("screen figures equal the API estimate", async ({ page }) => {
   expect(chinaTile).toBe(money(china.estimate.central));
 
   // Analytics, 2024 → tile 1 is the year estimate, the sum over partners.
-  await page.click('[role=tab]:has-text("Analytics")');
+  await page.click('[role=tab]:has-text("Corridors")');
   await expect(page.getByText("Revenue at stake (estimate)", { exact: false }).first()).toBeVisible({ timeout: 30_000 });
   const yearTile = await tileValue(page, 0);
   const all = await (await page.request.get("/api/mirror?year=2024&partner=all")).json();
