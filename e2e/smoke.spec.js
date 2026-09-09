@@ -12,9 +12,16 @@ async function login(page) {
   await page.goto("/login");
   await page.fill("#username", USER);
   await page.fill("#password", PASS);
-  await page.click("button[type=submit]");
-  await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 60_000 });
-  await page.locator("table.dt tbody tr").first().waitFor({ timeout: 90_000 });
+  // The cookie is set by the POST; on a cold dev server the client-side
+  // redirect can stall while "/" compiles, so navigate directly once the login
+  // response has arrived rather than waiting on the router.
+  const [res] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/api/auth/login"), { timeout: 60_000 }),
+    page.click("button[type=submit]"),
+  ]);
+  expect(res.ok()).toBeTruthy();
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 120_000 });
+  await page.locator("table.dt tbody tr").first().waitFor({ timeout: 120_000 });
 }
 
 const tileValue = async (page, index) => {

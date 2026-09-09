@@ -18,3 +18,7 @@ __pycache__/
 
 # Skill bundles dropped into the folder for reference
 ui-ux-pro-max-skill-main*.zip
+
+# Playwright output
+test-results/
+playwright-report/
