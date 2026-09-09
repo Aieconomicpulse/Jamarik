@@ -24,8 +24,15 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-`.env.local` ships with a working username and password so the portal opens
-straight away. It is gitignored and never reaches GitHub.
+Create `.env.local` from `.env.example` and set `PORTAL_USER`,
+`PORTAL_PASSWORD` and `SESSION_SECRET` (`openssl rand -base64 32`). It is
+gitignored and never reaches GitHub; in production the app refuses to start
+without them.
+
+Two pipeline paths exist today and are not yet joined: `pipeline/comtrade_fetch.py`
+pulls from the Comtrade API into a parquet cache, while `pipeline/build_mirror.py`
+reads bulk TSV downloads from a folder and writes the two JSON files the portal
+serves. The portal is built from the second; Ticket 11 in `FIXPLAN.md` joins them.
 
 ---
 

@@ -36,7 +36,7 @@ export default function Analytics({ data, year, onOpenProducts, onOpenLedger, ye
     corridors.forEach((c) => { m[c.partnerName] = c.partner; });
     return m;
   }, [corridors]);
-  const [measure, setMeasure] = useState("fiscal"); // fiscal | count
+  const [measure, setMeasure] = useState("count"); // count | fiscal
   const s = useMemo(() => summary(corridors), [corridors]);
   const t = useMemo(() => triage(corridors), [corridors]);
 
@@ -129,6 +129,9 @@ export default function Analytics({ data, year, onOpenProducts, onOpenLedger, ye
             <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#a9a394" }} />within normal</span>
             <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#6b6555" }} />Lebanon declares more</span>
           </div>
+          {measure === "fiscal" && (
+            <div className="text-[11.5px] text-slate2 mt-2">Normal and over-declared bands carry no fiscal loss by definition; switch to Corridors to see their size.</div>
+          )}
         </div>
       </Panel>
 

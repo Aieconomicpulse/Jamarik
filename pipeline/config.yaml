@@ -6,6 +6,11 @@
 
 lebanon_code: 422
 
+# PLANNED, NOT YET CONSUMED BY THE BUILD: `years`, `directions: [exports]` and
+# `monthly` below drive comtrade_fetch.py only. build_mirror.py reads whatever
+# bulk files are in --dir and mirrors imports for the years it finds there;
+# Ticket 11 joins the two paths.
+
 # Years to pull. A gap that persists across six years is a system; one that
 # appears in a single year is usually a data error. Six years costs no more in
 # API calls than one — the calls are per reporter, and periods batch.
@@ -52,13 +57,13 @@ hubs:
   792: Türkiye
   344: China, Hong Kong SAR
 
-# Trade directions to mirror.
+# Trade directions to mirror. (Planned: only `imports` is built today.)
 #   imports  — Lebanon's imports vs partners' exports  → under-invoicing, smuggling
 #   exports  — Lebanon's exports vs partners' imports  → phantom exports, capital flight
 directions: [imports, exports]
 
 # Also pull monthly data for the current and previous year, for the fast
-# publishers only. This drives the early-warning view.
+# publishers only. (Planned: the early-warning view is not built yet.)
 monthly:
   enabled: true
   years: [2025, 2026]
