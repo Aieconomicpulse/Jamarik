@@ -31,6 +31,7 @@ function buildContext(data) {
       quantity_available: meta.quantity_available,
       quantity_note: meta.quantity_note,
       diagnostics: meta.diagnostics,
+      estimate: meta.estimate?.years,
     },
     totals,
     sig_counts,

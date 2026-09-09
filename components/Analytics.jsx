@@ -5,7 +5,7 @@ import {
   Bar as RBar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { money, pct } from "@/lib/format";
-import { groupBy, summary } from "@/lib/losses";
+import { estimateFor, groupBy, summary } from "@/lib/losses";
 import { triage } from "@/lib/triage";
 import { Bar, Chip, Panel, PanelHead, Segmented, Tile } from "@/components/ui";
 
@@ -25,7 +25,7 @@ const BANDS = [
 
 const SIG_TONE = { under_invoicing: "burgundy", value_gap: "gold", over_invoicing: "neutral", normal: "cedar" };
 
-export default function Analytics({ data, onOpenProducts, onOpenLedger, yearControl }) {
+export default function Analytics({ data, year, onOpenProducts, onOpenLedger, yearControl }) {
   const { meta, corridors = [] } = data;
   // Partner names back to codes, so a click can open the product view.
   const partnerCode = useMemo(() => {
@@ -55,8 +55,11 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger, yearCont
   const top = useMemo(() => t.recoverable.slice(0, 10), [t]);
 
   const flaggedShare = s.corridors ? (s.under.count + s.unrecorded.count) / s.corridors : 0;
-  const maxCh = Math.max(...chapters.map((c) => c.fiscal), 1);
-  const maxP = Math.max(...partners.map((c) => c.fiscal), 1);
+  // The headline is the noise-corrected estimate; gross sums are shown as bounds.
+  const est = estimateFor(meta, year);
+  const val = (r) => (est ? r.corrected : r.fiscal);
+  const maxCh = Math.max(...chapters.map(val), 1);
+  const maxP = Math.max(...partners.map(val), 1);
 
   return (
     <div className="fade-in">
@@ -68,12 +71,25 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger, yearCont
       )}
       {/* Numbers first */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
-        <Tile label="Revenue not collected" value={money(s.fiscal)} tone="gold" />
-        <Tile label="of which VAT" value={money(s.vat)} />
-        <Tile label="of which duty (indicative)" value={money(s.duty)} />
-        <Tile label="Corridors flagged" value={`${s.under.count + s.unrecorded.count} · ${pct(flaggedShare * 100, 0)}`} />
-        <Tile label="Under-declared" value={money(s.under.fiscal)} tone="burgundy" />
-        <Tile label="Unrecorded · verify" value={money(s.unrecorded.fiscal)} tone="sea" />
+        {est ? (
+          <>
+            <Tile label="Revenue at stake (estimate)" value={money(est.central)} tone="gold" sub={`range ${money(est.lo)}–${money(est.hi)} · gross ${money(s.fiscal)}`} />
+            <Tile label="of which VAT" value={money(s.fiscal ? s.vat * est.central / s.fiscal : 0)} sub="scaled to the estimate" />
+            <Tile label="of which duty (indicative)" value={money(s.fiscal ? s.duty * est.central / s.fiscal : 0)} sub="scaled to the estimate" />
+            <Tile label="Corridors flagged" value={`${s.under.count + s.unrecorded.count} · ${pct(flaggedShare * 100, 0)}`} />
+            <Tile label="Under-declared" value={money(s.under.corrected)} tone="burgundy" sub={`gross ${money(s.under.fiscal)}`} />
+            <Tile label="Unrecorded · verify" value={money(s.unrecorded.corrected)} tone="sea" sub={`gross ${money(s.unrecorded.fiscal)}`} />
+          </>
+        ) : (
+          <>
+            <Tile label="Revenue not collected" value={money(s.fiscal)} tone="gold" />
+            <Tile label="of which VAT" value={money(s.vat)} />
+            <Tile label="of which duty (indicative)" value={money(s.duty)} />
+            <Tile label="Corridors flagged" value={`${s.under.count + s.unrecorded.count} · ${pct(flaggedShare * 100, 0)}`} />
+            <Tile label="Under-declared" value={money(s.under.fiscal)} tone="burgundy" />
+            <Tile label="Unrecorded · verify" value={money(s.unrecorded.fiscal)} tone="sea" />
+          </>
+        )}
       </div>
 
       {/* Shape of the problem */}
@@ -116,7 +132,7 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger, yearCont
       {/* Where */}
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
         <Panel>
-          <PanelHead title="By product" sub="HS chapter · revenue not collected" />
+          <PanelHead title="By product" sub={est ? "HS chapter · revenue at stake (estimate) · gross in small print" : "HS chapter · revenue not collected"} />
           <ul className="px-5 py-4 space-y-3.5">
             {chapters.map((r) => (
               <li key={r.key}>
@@ -124,16 +140,17 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger, yearCont
                   className="w-full text-left group cursor-pointer rounded-md -mx-2 px-2 py-1 transition-colors hover:bg-gold/5" title="Open every product in this chapter">
                   <div className="flex items-baseline justify-between gap-3 mb-1">
                     <span className="text-[13.5px] text-ink2 group-hover:text-gold transition-colors">{r.label} <span className="text-slate2 num text-[11px] ml-1">{r.key}</span></span>
-                    <span className="num text-[13px] text-ink">{money(r.fiscal)}</span>
+                    <span className="num text-[13px] text-ink">{money(val(r))}</span>
                   </div>
-                    <Bar value={r.fiscal / maxCh} tone="burgundy" />
+                  <Bar value={val(r) / maxCh} tone="burgundy" />
+                  {est && <div className="text-[11px] text-slate2 num mt-1">gross {money(r.fiscal)}</div>}
                 </button>
               </li>
             ))}
           </ul>
         </Panel>
         <Panel>
-          <PanelHead title="By partner" sub="Origin as declared · revenue not collected · click for products"
+          <PanelHead title="By partner" sub={est ? "Origin as declared · revenue at stake (estimate) · click for products" : "Origin as declared · revenue not collected · click for products"}
             right={onOpenProducts && (
               <button onClick={() => onOpenProducts({ partner: "all" })} className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[11px] uppercase tracking-wider num text-gold hover:text-gold2 hover:bg-gold/5 cursor-pointer transition-colors">
                 All products →
@@ -146,10 +163,10 @@ export default function Analytics({ data, onOpenProducts, onOpenLedger, yearCont
                   className="w-full text-left group cursor-pointer rounded-md -mx-2 px-2 py-1 transition-colors hover:bg-gold/5" title={`Open ${r.key} product by product`}>
                   <div className="flex items-baseline justify-between gap-3 mb-1">
                     <span className="text-[13.5px] text-ink2 group-hover:text-gold transition-colors">{r.key} <span className="text-slate2 num text-[11px] ml-1">{r.count} headings</span></span>
-                    <span className="num text-[13px] text-ink">{money(r.fiscal)}</span>
+                    <span className="num text-[13px] text-ink">{money(val(r))}</span>
                   </div>
-                  <Bar value={r.fiscal / maxP} tone="burgundy" />
-                  <div className="text-[11px] text-slate2 num mt-1">{money(r.trade)} trade · {pct(100 * r.fiscal / Math.max(r.trade, 1), 1)} of it</div>
+                  <Bar value={val(r) / maxP} tone="burgundy" />
+                  <div className="text-[11px] text-slate2 num mt-1">{money(r.trade)} trade · {pct(100 * val(r) / Math.max(r.trade, 1), 1)} of it{est && ` · gross ${money(r.fiscal)}`}</div>
                 </button>
               </li>
             ))}

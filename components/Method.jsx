@@ -58,6 +58,30 @@ export default function Method({ meta, stamp }) {
         </div>
       </Panel>
 
+      {meta.estimate?.years && (
+        <Panel className="mb-6">
+          <PanelHead title="The estimate" sub="The number to quote: HS-4 corridors, corrected for the noise two customs services produce on their own" />
+          <div className="overflow-x-auto">
+            <table className="dt">
+              <thead><tr><th>Year</th><th className="text-right">Gross (uncorrected)</th><th className="text-right">Central estimate</th><th className="text-right">90% range</th><th className="text-right">Floor</th><th className="text-right">Flagged corridors</th></tr></thead>
+              <tbody>
+                {Object.entries(meta.estimate.years).map(([y, v]) => (
+                  <tr key={y}>
+                    <td className="num">{y}</td>
+                    <td className="text-right num">{money(v.gross)}</td>
+                    <td className="text-right num text-gold">{money(v.central)}</td>
+                    <td className="text-right num">{money(v.lo)} – {money(v.hi)}</td>
+                    <td className="text-right num">{money(v.floor)}</td>
+                    <td className="text-right num">{v.flagged}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-5 py-4 text-[12.5px] text-slate1 leading-relaxed">{meta.estimate.note}</div>
+        </Panel>
+      )}
+
       <Panel className="mb-6">
         <PanelHead title="What the figures rest on" />
         <dl className="px-5 py-4 text-[13px] leading-relaxed space-y-4">

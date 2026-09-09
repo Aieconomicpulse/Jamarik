@@ -123,10 +123,10 @@ export default function CustomsGap({ gaps, stamp }) {
 
       {tab === "products" && <Products defaultYear={productYear} focus={focus} vatRate={meta.vat_rate} />}
       {tab === "analytics" && (
-        <Analytics data={slice} onOpenProducts={openProducts} onOpenLedger={() => setTab("ledger")} yearControl={yearControl} />
+        <Analytics data={slice} year={year} onOpenProducts={openProducts} onOpenLedger={() => setTab("ledger")} yearControl={yearControl} />
       )}
-      {tab === "ledger" && <GapForensics data={slice} onOpenProducts={openProducts} yearControl={yearControl} />}
-      {tab === "detective" && <TradeDetective data={slice} yearControl={yearControl} />}
+      {tab === "ledger" && <GapForensics data={slice} year={year} onOpenProducts={openProducts} yearControl={yearControl} />}
+      {tab === "detective" && <TradeDetective data={slice} year={year} yearControl={yearControl} />}
       {tab === "method" && <Method meta={meta} stamp={stamp} />}
     </div>
   );

@@ -194,6 +194,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
   // alone says it sent: the goods are not in Lebanon's records under any origin.
   const absent = (r) => r.g > 0 && REVENUE_READINGS.has(r.rd) && r.lw < 0.85 * r.xc;
   const basis = BASIS[data?.basis] || null;
+  const est = data?.estimate && data.estimate.central != null ? data.estimate : null;
 
   const rows = useMemo(() => {
     let r = rolled;
@@ -258,6 +259,17 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
       {s && (
         <>
           {/* The sentence */}
+          {est ? (
+          <p className="text-[15.5px] md:text-[17px] text-ink2 leading-relaxed max-w-4xl mb-6">
+            In {data.year}, <span className="text-ink">{many ? `${data.partners.length} partners` : name}</span>{" "}
+            {many ? "say they" : "says it"} exported <span className="num text-ink">{money(s.x_cif)}</span> to Lebanon and Lebanon registered{" "}
+            <span className="num text-ink">{money(s.m)}</span>{s.structural?.value > 0 && <> (after setting aside <span className="num text-sea">{money(s.structural.value)}</span> in one-sided {s.structural.headings.map((h) => `HS ${h.hs4}`).join(", ")})</>}.
+            After correcting for ordinary classification noise, an estimated <span className="num text-gold font-medium">{money(est.central)}</span> of VAT and duty is at stake on {many ? "these" : name} headings
+            (uncorrected: <span className="num">{money(est.gross)}</span>). Line by line, Lebanon registered{" "}
+            <span className="num text-burgundy">{money(s.shortfall)}</span> less on <span className="num text-ink">{s.revenue_lines.toLocaleString()}</span> products;
+            the VAT on that gross shortfall is <span className="num">{money(s.vat_lost)}</span>.
+          </p>
+          ) : (
           <p className="text-[15.5px] md:text-[17px] text-ink2 leading-relaxed max-w-4xl mb-6">
             In {data.year}, <span className="text-ink">{many ? `${data.partners.length} partners` : name}</span>{" "}
             {many ? "say they" : "says it"} exported <span className="num text-ink">{money(s.x_cif)}</span> to Lebanon.
@@ -271,12 +283,17 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             registered <span className="num text-burgundy">{money(s.shortfall)}</span> less than {many ? "the partners" : name} reported,
             and the VAT not collected on those is <span className="num text-gold">{money(s.vat_lost)}</span>.
           </p>
+          )}
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
             <Tile label={`${many ? "Partners" : name} exported`} value={money(s.x_cif)} sub={`${money(s.x_fob)} FOB, CIF-adjusted ×${avail?.meta?.cif_factor ?? 1.05}`} />
             <Tile label="Lebanon registered" value={money(s.m)} sub={`${s.cover == null ? "—" : `${Math.round(s.cover * 100)}% of the partner figure`}${s.structural?.value ? ` · ${money(s.structural.value)} set aside` : ""}`} />
             <Tile label="Difference in total" value={money(s.gap)} tone={s.gap > 0 ? "burgundy" : "ink"} sub={s.gap > 0 ? "Lebanon registered less overall" : "Lebanon registered more overall"} />
-            <Tile label="VAT not collected" value={money(s.vat_lost)} tone="gold" sub={`${Math.round(rate * 100)}% of ${money(s.shortfall)} short on ${s.revenue_lines.toLocaleString()} products · netted within chapter: ${money(conservative.vat)}`} />
+            {est ? (
+              <Tile label="VAT and duty at stake (estimate)" value={money(est.central)} tone="gold" sub={`gross line-level VAT ${money(s.vat_lost)} · netted within chapter ${money(conservative.vat)}`} />
+            ) : (
+              <Tile label="VAT not collected" value={money(s.vat_lost)} tone="gold" sub={`${Math.round(rate * 100)}% of ${money(s.shortfall)} short on ${s.revenue_lines.toLocaleString()} products · netted within chapter: ${money(conservative.vat)}`} />
+            )}
           </div>
 
           {/* One-sided headings that would dominate the corridor, set aside and said out loud. */}
@@ -311,7 +328,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             <div className="px-4 pb-4 pt-1 text-[12.5px] text-ink2 leading-relaxed grid md:grid-cols-3 gap-x-8 gap-y-3">
               <p><span className="text-ink">Total difference</span> is a net: products where Lebanon registered less, minus products where it registered more. VAT is charged declaration by declaration, so registering more on one product never refunds the VAT missed on another. <span className="text-ink">VAT not collected</span> counts only the products where Lebanon registered less — {s.revenue_lines.toLocaleString()} of them here, {money(s.shortfall)} short.</p>
               <p><span className="text-ink">Same goods, different code.</span> Both sides are put on HS 2017 with the official UNSD table before pairing, so edition changes are handled. What the table cannot fix is practice: one customs service files a product under one heading, the other under a neighbour (medicaments 3004 vs immunologicals 3002). When a chapter balances but its headings gap in opposite directions, the line is tagged <Chip tone="neutral">chapter balances</Chip> and should be read as coding, not revenue.</p>
-              <p><span className="text-ink">Two figures, deliberately.</span> Line by line: <span className="num text-gold">{money(s.vat_lost)}</span>. Netted within each chapter first: <span className="num text-gold">{money(conservative.vat)}</span> on {money(conservative.short)} short. The truth sits between them; the first is what a declaration-level audit would test, the second is what survives every classification argument. Switch to the <span className="text-ink">Chapter</span> level to see the netted view directly.</p>
+              <p><span className="text-ink">The number to quote</span> is the estimate in the fourth tile: the HS-4 corridor figure after the noise correction, with its range on the Analytics tab. The line figures below it are bounds and detail. <span className="text-ink">Two figures, deliberately.</span> Line by line: <span className="num text-gold">{money(s.vat_lost)}</span>. Netted within each chapter first: <span className="num text-gold">{money(conservative.vat)}</span> on {money(conservative.short)} short. The truth sits between them; the first is what a declaration-level audit would test, the second is what survives every classification argument. Switch to the <span className="text-ink">Chapter</span> level to see the netted view directly.</p>
             </div>
           </details>
 

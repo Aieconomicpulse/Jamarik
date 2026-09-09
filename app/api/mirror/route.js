@@ -1,4 +1,4 @@
-import { loadHs6 } from "@/lib/data";
+import { loadGaps, loadHs6 } from "@/lib/data";
 
 // The HS-6 mirror, served one partner-year at a time — or every mirrored
 // partner at once with partner=all.
@@ -93,6 +93,13 @@ export async function GET(req) {
   const codes = all ? [...new Set(rows.map((r) => r.p))].sort() : [partner];
   const partners = codes.map((p) => ({ code: p, name: COUNTRIES[p] ?? String(p) }));
 
+  // The headline is the HS-4 noise-corrected estimate, not a sum of lines.
+  const gaps = await loadGaps();
+  const yr = gaps.meta.estimate?.years?.[String(year)];
+  const est = all
+    ? Object.values(yr?.partners || {}).reduce((a, p) => ({ gross: a.gross + p.gross, central: a.central + p.central, floor: a.floor + p.floor }), { gross: 0, central: 0, floor: 0 })
+    : (yr?.partners?.[String(partner)] ?? null);
+
   return Response.json(
     {
       year,
@@ -104,6 +111,7 @@ export async function GET(req) {
       basis: all ? "mixed" : (hs6.meta.basis?.[`${year}:${partner}`] ?? null),
       exempt_hs: hs6.meta.exempt_hs ?? [],
       summary: summarise(rows),
+      estimate: est,
       rows,
       served_at: new Date().toISOString(),
     },
