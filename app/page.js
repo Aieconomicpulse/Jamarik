@@ -7,7 +7,8 @@ import Footer from "@/components/Footer";
 
 // Every number on the page comes through lib/data.js. Today that is a JSON
 // file bundled at build time; when it becomes a live query the page renders
-// on demand, which is why this route is already dynamic.
+// on demand, which is why this route is already dynamic. The corridor rows
+// themselves are not in the HTML: the tabs fetch them from /api/corridors.
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
@@ -20,7 +21,7 @@ export default async function Page() {
     <div className="min-h-screen flex flex-col">
       <TopBar user={session?.u} generated={gaps.meta?.generated} />
       <main className="flex-1">
-        <CustomsGap gaps={gaps} stamp={dataStamp()} />
+        <CustomsGap gaps={{ meta: gaps.meta, years: gaps.years }} stamp={dataStamp()} />
       </main>
       <Footer meta={gaps.meta} />
     </div>

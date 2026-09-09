@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Products from "@/components/Products";
 import Analytics from "@/components/Analytics";
 import GapForensics from "@/components/GapForensics";
 import TradeDetective from "@/components/TradeDetective";
 import Method from "@/components/Method";
 import { sliceFor } from "@/lib/slice";
-import { Icon, Segmented } from "@/components/ui";
+import { Icon, Segmented, Skeleton } from "@/components/ui";
 
 // Products leads: one partner, one year, every product — exported, registered,
 // difference, VAT. Analytics gives the shape; the ledger is the audit surface
@@ -22,15 +22,33 @@ const TABS = [
 ];
 
 export default function CustomsGap({ gaps, stamp }) {
-  const { meta, corridors } = gaps;
+  const { meta } = gaps;
   const years = meta.years || [];
   const [tab, setTab] = useState("products");
   const [year, setYear] = useState(String(meta.base_year ?? years[years.length - 1]));
   const [focus, setFocus] = useState(null);
 
+  // The corridor rows come from /api/corridors, one year at a time, and are
+  // kept once fetched so switching back is instant. The page HTML carries only
+  // meta and the per-year summaries.
+  const [corridors, setCorridors] = useState(null);
+  const cache = useRef(new Map());
+  useEffect(() => {
+    const key = String(year);
+    if (cache.current.has(key)) { setCorridors(cache.current.get(key)); return; }
+    let live = true;
+    setCorridors(null);
+    fetch(`/api/corridors?year=${key}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => { cache.current.set(key, d.corridors || []); if (live) setCorridors(d.corridors || []); })
+      .catch(() => { if (live) setCorridors([]); });
+    return () => { live = false; };
+  }, [year]);
+  const loadingCorridors = corridors === null;
+
   // One year (or both) of the corridor file, shaped for the tabs. The same
   // function builds the Detective's grounding on the server.
-  const slice = useMemo(() => sliceFor(gaps, year), [gaps, year]);
+  const slice = useMemo(() => sliceFor({ ...gaps, corridors: corridors || [] }, year), [gaps, corridors, year]);
 
   const productYear = year === "all" ? meta.base_year : Number(year);
 
@@ -90,11 +108,19 @@ export default function CustomsGap({ gaps, stamp }) {
       </nav>
 
       {tab === "products" && <Products defaultYear={productYear} focus={focus} vatRate={meta.vat_rate} />}
-      {tab === "analytics" && (
+      {tab !== "products" && tab !== "method" && loadingCorridors && (
+        <div aria-busy="true" aria-label="Loading corridors">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
+            {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[92px]" />)}
+          </div>
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-12 mb-2" />)}
+        </div>
+      )}
+      {tab === "analytics" && !loadingCorridors && (
         <Analytics data={slice} year={year} onOpenProducts={openProducts} onOpenLedger={() => setTab("ledger")} yearControl={yearControl} />
       )}
-      {tab === "ledger" && <GapForensics data={slice} year={year} onOpenProducts={openProducts} yearControl={yearControl} />}
-      {tab === "detective" && <TradeDetective data={slice} year={year} yearControl={yearControl} />}
+      {tab === "ledger" && !loadingCorridors && <GapForensics data={slice} year={year} onOpenProducts={openProducts} yearControl={yearControl} />}
+      {tab === "detective" && !loadingCorridors && <TradeDetective data={slice} year={year} yearControl={yearControl} />}
       {tab === "method" && <Method meta={meta} stamp={stamp} />}
     </div>
   );

@@ -112,7 +112,11 @@ export async function GET(req) {
       exempt_hs: hs6.meta.exempt_hs ?? [],
       summary: summarise(rows),
       estimate: est,
-      rows,
+      // The all-partners view does not read the per-line provenance fields;
+      // ?fields=full brings them back.
+      rows: all && url.searchParams.get("fields") !== "full"
+        ? rows.map(({ pc, lv, pv, kg, ...r }) => r)
+        : rows,
       served_at: new Date().toISOString(),
     },
     { headers: NO_STORE }
