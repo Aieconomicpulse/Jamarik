@@ -6,15 +6,13 @@ import {
 } from "recharts";
 import { money, pct } from "@/lib/format";
 import { estimateFor, groupBy, summary } from "@/lib/losses";
-import { triage } from "@/lib/triage";
-import { Bar, Chip, Panel, PanelHead, Segmented, Tile } from "@/components/ui";
+import { Bar, Panel, PanelHead, Segmented, Tile } from "@/components/ui";
 
 const AXIS = "#7c7563";
 const GRID = "rgba(222,217,202,0.9)";
 
 // Cover bands, low to high. Colour carries the reading; the label carries it too.
 // Evidence rung → chip colour: the more tests a corridor passes, the warmer.
-const RUNG_TONE = { strong: "burgundy", probable: "gold", verify: "neutral" };
 
 const BANDS = [
   { lo: 0.0, hi: 0.2, label: "0–20%", fill: "#1f6bc4", reading: "unrecorded" },
@@ -26,9 +24,8 @@ const BANDS = [
   { lo: 1.6, hi: 99, label: "> 160%", fill: "#6b6555", reading: "Lebanon more" },
 ];
 
-const SIG_TONE = { under_invoicing: "burgundy", value_gap: "gold", over_invoicing: "neutral", normal: "cedar" };
 
-export default function Analytics({ data, year, onOpenProducts, onOpenLedger, yearControl }) {
+export default function Analytics({ data, year, onOpenProducts, yearControl }) {
   const { meta, corridors = [] } = data;
   // Partner names back to codes, so a click can open the product view.
   const partnerCode = useMemo(() => {
@@ -38,7 +35,6 @@ export default function Analytics({ data, year, onOpenProducts, onOpenLedger, ye
   }, [corridors]);
   const [measure, setMeasure] = useState("count"); // count | fiscal
   const s = useMemo(() => summary(corridors), [corridors]);
-  const t = useMemo(() => triage(corridors), [corridors]);
 
   const hist = useMemo(
     () => BANDS.map((b) => {
@@ -55,7 +51,6 @@ export default function Analytics({ data, year, onOpenProducts, onOpenLedger, ye
 
   const chapters = useMemo(() => groupBy(corridors, "hs2", 10), [corridors]);
   const partners = useMemo(() => groupBy(corridors, "partnerName", 8), [corridors]);
-  const top = useMemo(() => t.recoverable.slice(0, 10), [t]);
 
   const flaggedShare = s.corridors ? (s.under.count + s.unrecorded.count) / s.corridors : 0;
   // The headline is the noise-corrected estimate; gross sums are shown as bounds.
@@ -180,51 +175,6 @@ export default function Analytics({ data, year, onOpenProducts, onOpenLedger, ye
         </Panel>
       </div>
 
-      {/* What to open first */}
-      <Panel>
-        <PanelHead title="Open these first" sub="Under-declared corridors ranked by expected recoverable · click a row for its products"
-          right={onOpenLedger && (
-            <button onClick={onOpenLedger} className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[11px] uppercase tracking-wider num text-slate1 hover:text-ink hover:bg-bone2 cursor-pointer transition-colors">
-              Full ledger →
-            </button>
-          )} />
-        <div className="overflow-x-auto">
-          <table className="dt">
-            <thead>
-              <tr>
-                <th>#</th><th>Partner</th><th>Heading</th><th>Product</th>
-                <th className="text-right">Partner (CIF-adj.)</th><th className="text-right">Lebanon</th>
-                <th className="text-right">Recorded</th><th>Reading</th>
-                <th className="text-right">Revenue lost</th><th className="text-right">Estimated</th>
-                <th>Rung</th><th>Why</th>
-              </tr>
-            </thead>
-            <tbody>
-              {top.map((c) => (
-                <tr key={`${c.partner}-${c.hs4}`} className="cursor-pointer"
-                  onClick={() => onOpenProducts?.({ partner: c.partner, chapter: c.hs2, hs4: c.hs4 })}
-                  title="Open this heading product by product">
-                  <td className="num text-slate2">{String(c.rank).padStart(2, "0")}</td>
-                  <td className="whitespace-nowrap">{c.partnerName}</td>
-                  <td className="num text-[12px]">{c.label}</td>
-                  <td className="text-[13px]">{c.chapter}</td>
-                  <td className="text-right num">{money(c.x_cif)}</td>
-                  <td className="text-right num">{money(c.m)}</td>
-                  <td className="text-right num">{Math.round(c.cover * 100)}%</td>
-                  <td><Chip tone={SIG_TONE[c.signature]}>{meta.signatures?.[c.signature] ?? c.signature}</Chip></td>
-                  <td className="text-right num text-slate1">{money(c.fiscal_loss)}</td>
-                  <td className="text-right num text-gold">{money(c.fiscal_loss * (c.p_real ?? 0))}</td>
-                  <td><Chip tone={RUNG_TONE[c.rung.level]}>{c.rung.level}</Chip></td>
-                  <td className="text-[12px] text-slate1 leading-snug max-w-[360px]">{c.rung.tests.join(" · ")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-5 py-3 border-t border-rule text-[11.5px] text-slate2">
-          Ranked by expected recoverable = corrected loss × collectability (0.5 until calibrated). Under-declared corridors only — the strongest claim; unrecorded ones are listed in the ledger under their own reading.
-        </div>
-      </Panel>
     </div>
   );
 }

@@ -122,7 +122,7 @@ export default function CustomsGap({ gaps, stamp }) {
         </div>
       )}
       {tab === "analytics" && !loadingCorridors && (
-        <Analytics data={slice} year={year} onOpenProducts={openProducts} onOpenLedger={() => setTab("ledger")} yearControl={yearControl} />
+        <Analytics data={slice} year={year} onOpenProducts={openProducts} yearControl={yearControl} />
       )}
       {tab === "ledger" && !loadingCorridors && <GapForensics data={slice} year={year} onOpenProducts={openProducts} yearControl={yearControl} />}
       {tab === "detective" && !loadingCorridors && <TradeDetective data={slice} year={year} yearControl={yearControl} />}
