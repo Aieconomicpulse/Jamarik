@@ -363,75 +363,6 @@ def classify(cover: float) -> str:
     return "normal"
 
 
-def corridors_for(lebanon: pd.DataFrame, partner: pd.DataFrame,
-                  code: int, year: int, hs: Concordance, world4: pd.Series) -> list[dict]:
-    leb = lebanon[(lebanon.flowCode == "M") & (lebanon.partnerCode == code)].copy()
-    ptr = domestic_exports(partner)
-    if leb.empty or ptr.empty:
-        return []
-
-    # Both sides on HS 2017 before the heading is cut.
-    ptr = to_hs2017(ptr, hs)
-    leb["hs4"] = leb.cmdCode.str[:4]
-    ptr["hs4"] = ptr.h17.str[:4]
-    a = leb.groupby("hs4").primaryValue.sum().rename("m")
-    b = ptr.groupby("hs4").agg(x_fob=("primaryValue", "sum"), x_kg=("netWgt", "sum"), rx=("rx", "sum"))
-    total_x, total_m = float(b.x_fob.sum()) * CIF_FACTOR, float(a.sum())
-    frame = pd.concat([a, b], axis=1).fillna(0.0).reset_index()
-    frame = frame[(frame.x_fob >= MIN_PARTNER_VALUE) & (~frame.hs4.isin(EXCLUDED_HS4))]
-
-    out = []
-    for r in frame.itertuples():
-        x_cif = r.x_fob * CIF_FACTOR
-        gap = x_cif - r.m                       # positive = Lebanon declared less
-        cover = r.m / x_cif if x_cif else 0.0
-        share = structural_share(x_cif, r.m, total_x, total_m)
-        sig = "structural" if share else ("exempt" if is_exempt(r.hs4) else classify(cover))
-        hs2 = r.hs4[:2]
-        rate = duty_rate_for(r.hs4, code)
-        m_world = float(world4.get(r.hs4, 0.0))
-
-        # Fiscal loss only where Lebanon declared LESS. Over-declaration is not a
-        # revenue loss — it is money leaving, counted separately.
-        shortfall = max(gap, 0.0) if sig in ("under_invoicing", "value_gap") else 0.0
-        # Over-declared value is the outflow measure: what Lebanon recorded above
-        # anything a partner reports shipping.
-        outflow = max(-gap, 0.0) if sig == "over_invoicing" else 0.0
-
-        out.append({
-            "year": year,
-            "partner": code,
-            "partnerName": COUNTRY.get(code, str(code)),
-            "hs4": r.hs4,
-            "hs2": hs2,
-            "chapter": CHAPTERS.get(hs2, f"Chapter {hs2}"),
-            "label": f"HS {r.hs4}",
-            "x_fob": round(r.x_fob, 2),
-            "x_cif": round(x_cif, 2),
-            "m": round(r.m, 2),
-            "gap": round(gap, 2),
-            "gap_pct": round(100 * gap / x_cif, 1) if x_cif else 0.0,
-            "cover": round(cover, 3),
-            "qty_gap_pct": None,                # Lebanon publishes no genuine weights
-            "partner_kg": round(r.x_kg, 1) if r.x_kg else None,
-            "rx": round(r.rx, 2) if r.rx == r.rx else None,   # re-exports through the partner, FOB
-            "m_world": round(m_world, 2),                     # Lebanon's imports of the heading from every origin
-            "absent": bool(x_cif > 0 and m_world < ABSENT_RATIO * x_cif),
-            "share": round(share, 3) if share else None,   # of the corridor, when set aside as one-sided
-            "signature": sig,
-            "shortfall": round(shortfall, 2),
-            "outflow": round(outflow, 2),
-            "vat_floor": round(shortfall * VAT_RATE, 2),
-            "duty_rate": rate,
-            "duty_loss": round(shortfall * rate, 2),
-            "fiscal_loss": round(shortfall * (VAT_RATE + rate), 2),
-            "confidence": "medium" if r.x_fob > 1e6 else "low",
-            "preference": preference(code),
-            "hub": code in HUBS,
-        })
-    return out
-
-
 def summarise(rows: list[dict]) -> dict:
     def s(key, pred=lambda c: True):
         return round(sum(c[key] for c in rows if pred(c)), 2)
@@ -465,8 +396,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", type=Path, default=Path("all"))
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--hs6-out", type=Path, default=None,
-                    help="also write the HS-6 partner mirror, reading each file once")
+    ap.add_argument("--hs6-out", type=Path, required=True,
+                    help="the HS-6 partner mirror; the corridor set is derived from it")
     args = ap.parse_args()
 
     hs = Concordance()
@@ -480,7 +411,6 @@ def main() -> None:
     for y in years:
         print(f"  {y}: " + ", ".join(f"{COUNTRY.get(c, c)} <- {p.name}" for c, p in sorted(files[y].items())))
 
-    corridors: list[dict] = []
     per_year: dict[str, dict] = {}
     partners_by_year: dict[int, list[int]] = {}
     hs6: list[dict] = []
@@ -491,7 +421,6 @@ def main() -> None:
         leb, world4, lchecks = read_lebanon(files[year][LEBANON])
         totals_by[(year, LEBANON)] = lchecks["totals"]
         recon.append(reconcile(lchecks, leb, "M", 0, year, "Lebanon", "World"))
-        rows_this_year: list[dict] = []
         got = []
         basis_of: dict[int, str] = {}
         for code, path in sorted(files[year].items()):
@@ -503,23 +432,20 @@ def main() -> None:
             recon.append(reconcile(pchecks, ptr, "X", LEBANON, year, COUNTRY.get(code, str(code)), "Lebanon"))
             recon.append(reconcile(pchecks, ptr, "X", 0, year, COUNTRY.get(code, str(code)), "World"))
             basis_of[code] = export_basis(ptr)
-            rows = corridors_for(leb, ptr, code, year, hs, world4)
-            if rows:
-                rows_this_year.extend(rows)
-                got.append(code)
-                print(f"  {year} {COUNTRY.get(code, code):<15} {len(rows):>4} corridors · partner figure: {basis_of[code]}")
-            if args.hs6_out:
-                r = hs6_rows(leb, ptr, code, year, hs, world4)
-                EXPORT_BASIS[f"{year}:{code}"] = basis_of[code]
-                hs6.extend(r)
-                n = lambda st: sum(1 for x in r if x["st"] == st)  # noqa: E731
-                m = lambda k: sum(1 for x in r if x.get("map") == k)  # noqa: E731
-                print(f"       HS-6 mirror {len(r):>5} lines | paired {n('matched'):>4} | "
-                      f"one-sided: partner {n('partner_only'):>4}, Lebanon {n('lebanon_only'):>4} | "
-                      f"mapping: recoded {m('recoded')}, merged {m('merged')}, split {m('split')}, unmapped {m('unmapped')}")
+            r = hs6_rows(leb, ptr, code, year, hs, world4)
+            if not r:
+                continue
+            EXPORT_BASIS[f"{year}:{code}"] = basis_of[code]
+            hs6.extend(r)
+            got.append(code)
+            n = lambda st: sum(1 for x in r if x["st"] == st)  # noqa: E731
+            m = lambda k: sum(1 for x in r if x.get("map") == k)  # noqa: E731
+            print(f"  {year} {COUNTRY.get(code, code):<15} HS-6 mirror {len(r):>5} lines | paired {n('matched'):>4} | "
+                  f"one-sided: partner {n('partner_only'):>4}, Lebanon {n('lebanon_only'):>4} | "
+                  f"recoded {m('recoded')}, merged {m('merged')}, split {m('split')}, unmapped {m('unmapped')} | "
+                  f"partner figure: {basis_of[code]}")
         partners_by_year[year] = got
-        corridors.extend(rows_this_year)
-        per_year[str(year)] = summarise(rows_this_year)
+        per_year[str(year)] = {}
         per_year[str(year)]["partners"] = [
             {"code": c, "name": COUNTRY.get(c, str(c)), "hub": c in HUBS, "basis": basis_of[c]} for c in got
         ]
@@ -529,31 +455,6 @@ def main() -> None:
     comparable = sorted(set.intersection(*(set(v) for v in partners_by_year.values()))) \
         if len(partners_by_year) > 1 else sorted(partners_by_year.get(years[0], []))
     print(f"\n  comparable partner set: {[COUNTRY.get(c) for c in comparable]}")
-
-    # Persistence: a heading flagged in every year it could have been is a
-    # pattern; one flagged in a single year is usually noise or a reclassification.
-    seen: dict[tuple, set] = defaultdict(set)
-    flagged_in: dict[tuple, set] = defaultdict(set)
-    for c in corridors:
-        key = (c["partner"], c["hs4"])
-        seen[key].add(c["year"])
-        if c["signature"] in ("under_invoicing", "value_gap"):
-            flagged_in[key].add(c["year"])
-    for c in corridors:
-        key = (c["partner"], c["hs4"])
-        c["years_seen"] = len(seen[key])
-        c["years_flagged"] = len(flagged_in[key])
-        c["persistent"] = len(flagged_in[key]) > 1
-
-    # Year-on-year is only honest across the partners present in every year.
-    # 2023 carries the UAE and the USA, 2024 carries Saudi Arabia; comparing raw
-    # totals across those sets would show a fall that is a coverage change, not
-    # a policy result.
-    for year in years:
-        rows = [c for c in corridors if c["year"] == year and c["partner"] in comparable]
-        per_year[str(year)]["comparable"] = summarise(rows)
-
-    corridors.sort(key=lambda c: (-c["year"], -abs(c["gap"])))
 
     # The build checks itself and publishes the checks. Three tables: our HS-6
     # sums against every file's own TOTAL row; a few figures against what the
@@ -568,28 +469,8 @@ def main() -> None:
             ours = float(v.iloc[0])
             external.append({**{k: chk[k] for k in ("figure", "year", "published", "source")},
                              "ours": round(ours, 2), "diff_pct": round(100 * (ours - chk["published"]) / chk["published"], 2)})
-    pv = []
-    for year in years:
-        for code in partners_by_year[year]:
-            lines = [r for r in hs6 if r["y"] == year and r["p"] == code]
-            cs = [c for c in corridors if c["year"] == year and c["partner"] == code]
-            kept = [r for r in lines if r["rd"] != "structural"]
-            x = sum(r["xc"] for r in kept); m = sum(r["m"] for r in kept)
-            aside = [r for r in lines if r["rd"] == "structural"]
-            fiscal = sum(c["fiscal_loss"] for c in cs if c["signature"] in ("under_invoicing", "value_gap") and c["gap"] > 0)
-            absent = sum(c["fiscal_loss"] for c in cs if c["signature"] in ("under_invoicing", "value_gap") and c["gap"] > 0 and c["absent"])
-            pv.append({
-                "year": year, "code": code, "name": COUNTRY.get(code, str(code)),
-                "basis": EXPORT_BASIS.get(f"{year}:{code}"),
-                "lines": len(lines), "x_cif": round(x, 2), "m": round(m, 2), "ratio": round(m / x, 3) if x else None,
-                "set_aside": round(sum(r["xc"] + r["m"] for r in aside), 2),
-                "set_aside_hs4": sorted({r["hs4"] for r in aside}),
-                "rx": round(sum(r["rx"] or 0 for r in lines), 2),
-                "exempt_gap": round(sum(r["g"] for r in lines if r["rd"] == "exempt" and r["g"] > 0), 2),
-                "fiscal": round(fiscal, 2), "fiscal_absent": round(absent, 2),
-            })
     validation = {
-        "reconciliation": recon, "external": external, "partners": pv,
+        "reconciliation": recon, "external": external,
         "note": ("Every figure here is produced by the build itself. The reconciliation sums the HS-6 "
                  "rows the build uses and sets them against the TOTAL row Comtrade publishes in the same "
                  "file; a ratio other than 1.0000 would mean rows were double-counted or dropped. Mirror "
@@ -663,8 +544,37 @@ def main() -> None:
             ),
         },
         "years": per_year,
-        "corridors": corridors,
+        "corridors": [],
     }
+
+    # The corridor set, its persistence and the noise-corrected estimate all
+    # come from the post-processor, built from the HS-6 layer just assembled.
+    from estimate import run as postprocess  # noqa: E402  (same directory)
+    payload = postprocess(payload, {"rows": hs6})
+    corridors = payload["corridors"]
+    per_year = payload["years"]
+
+    pv = []
+    for year in years:
+        for code in partners_by_year[year]:
+            lines = [r for r in hs6 if r["y"] == year and r["p"] == code]
+            cs = [c for c in corridors if c["year"] == year and c["partner"] == code]
+            kept = [r for r in lines if r["rd"] != "structural"]
+            x = sum(r["xc"] for r in kept); m = sum(r["m"] for r in kept)
+            aside = [r for r in lines if r["rd"] == "structural"]
+            fiscal = sum(c["fiscal_loss"] for c in cs if c["signature"] in ("under_invoicing", "value_gap") and c["gap"] > 0)
+            absent = sum(c["fiscal_loss"] for c in cs if c["signature"] in ("under_invoicing", "value_gap") and c["gap"] > 0 and c["absent"])
+            pv.append({
+                "year": year, "code": code, "name": COUNTRY.get(code, str(code)),
+                "basis": EXPORT_BASIS.get(f"{year}:{code}"),
+                "lines": len(lines), "x_cif": round(x, 2), "m": round(m, 2), "ratio": round(m / x, 3) if x else None,
+                "set_aside": round(sum(r["xc"] + r["m"] for r in aside), 2),
+                "set_aside_hs4": sorted({r["hs4"] for r in aside}),
+                "rx": round(sum(r["rx"] or 0 for r in lines), 2),
+                "exempt_gap": round(sum(r["g"] for r in lines if r["rd"] == "exempt" and r["g"] > 0), 2),
+                "fiscal": round(fiscal, 2), "fiscal_absent": round(absent, 2),
+            })
+    payload["meta"]["validation"]["partners"] = pv
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(payload, indent=1))
@@ -688,9 +598,12 @@ def main() -> None:
               f"(under ${v['under']['fiscal']/1e6:>6,.1f}M + unrecorded ${v['unrecorded']['fiscal']/1e6:>6,.1f}M), "
               f"outflow ${v['over']['outflow']/1e6:>7,.1f}M")
     print(f"  persistent flagged headings: {sum(1 for c in corridors if c['persistent'])//2}")
+    print("\n  ESTIMATE (HS-4, noise-corrected):")
+    for y, v in payload["meta"]["estimate"]["years"].items():
+        print(f"    {y}: gross ${v['gross']/1e6:>6,.1f}M  central ${v['central']/1e6:>6,.1f}M  "
+              f"[{v['lo']/1e6:.0f}–{v['hi']/1e6:.0f}M]  floor ${v['floor']/1e6:.1f}M  flagged {v['flagged']}")
 
-    if args.hs6_out:
-        write_hs6(hs6, args.hs6_out)
+    write_hs6(hs6, args.hs6_out)
 
 
 

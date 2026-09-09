@@ -92,6 +92,19 @@ To rotate the password, change `PORTAL_PASSWORD` in Vercel. Changing
 
 ---
 
+## The worklist
+
+The first tab. Flagged corridors for one year, ranked by expected recoverable
+(corrected loss × collectability, 0.5 until calibrated from outcomes), each
+with its evidence rung and the named tests behind it, the partner's unit value
+beside Lebanon's declared value, and a status an officer sets: new, in review,
+audited, recovered (with the amount). Statuses are shared, recorded with the
+user who set them, and survive a reload; **Export to Excel** writes the table
+with the working per row. Storage is described in `db/README.md` — SQLite
+through Node's built-in driver on-prem, Postgres behind `DATABASE_URL` in the
+cloud (driver not wired yet). The Detective tab stays available behind a flag:
+`NEXT_PUBLIC_DETECTIVE=off` hides it.
+
 ## The data
 
 Two JSON files in `/data`, built by `pipeline/build_mirror.py` from UN Comtrade
@@ -104,7 +117,10 @@ python pipeline/build_mirror.py --dir "collected data" \
     --out data/mirror_gaps.json --hs6-out data/mirror_hs6.json
 ```
 
-After `build_mirror.py`, run the post-processor:
+`build_mirror.py` runs the post-processor, `pipeline/estimate.py`, itself at
+the end of the build, so one command produces the finished files. The
+post-processor can also be run on its own, without the raw files, to re-derive
+the corridor set and the estimate from an existing `mirror_hs6.json`:
 
 ```bash
 python pipeline/estimate.py --gaps data/mirror_gaps.json --hs6 data/mirror_hs6.json
