@@ -24,6 +24,7 @@ const ICONS = {
   send: "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z",
   info: "M12 16v-4M12 8h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z",
   scale: "M16 5v22M6 10h20M6 10 2 20a4.5 4.5 0 0 0 8 0ZM26 10l4 10a4.5 4.5 0 0 1-8 0ZM11 27h10",
+  tasks: "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
 };
 
 export function Icon({ name, className = "w-5 h-5", strokeWidth = 1.9 }) {

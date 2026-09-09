@@ -22,3 +22,6 @@ ui-ux-pro-max-skill-main*.zip
 # Playwright output
 test-results/
 playwright-report/
+
+# Worklist database (on-prem SQLite)
+data/worklist.sqlite*

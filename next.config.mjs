@@ -32,6 +32,11 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // The worklist store uses Node's built-in SQLite; keep it out of the bundle.
+  webpack(config, { isServer }) {
+    if (isServer) config.externals.push({ "node:sqlite": "commonjs node:sqlite" });
+    return config;
+  },
 };
 
 export default nextConfig;

@@ -6,6 +6,7 @@ import Analytics from "@/components/Analytics";
 import GapForensics from "@/components/GapForensics";
 import TradeDetective from "@/components/TradeDetective";
 import Method from "@/components/Method";
+import Worklist from "@/components/Worklist";
 import { sliceFor } from "@/lib/slice";
 import { Icon, Segmented, Skeleton } from "@/components/ui";
 
@@ -13,18 +14,21 @@ import { Icon, Segmented, Skeleton } from "@/components/ui";
 // difference, VAT. Analytics gives the shape; the ledger is the audit surface
 // behind both. Any row on those screens opens the product view for that
 // partner and heading, which is what "focus" carries.
+// The Detective stays available behind a flag: NEXT_PUBLIC_DETECTIVE=off hides it.
+const DETECTIVE = process.env.NEXT_PUBLIC_DETECTIVE !== "off";
 const TABS = [
+  ["worklist", "Worklist", "tasks"],
   ["products", "Products", "package"],
-  ["analytics", "Analytics", "chart"],
-  ["ledger", "Ledger", "table"],
-  ["detective", "Detective", "search"],
+  ["analytics", "Corridors", "chart"],
+  ["ledger", "Evidence", "table"],
+  ...(DETECTIVE ? [["detective", "Detective", "search"]] : []),
   ["method", "Method", "book"],
 ];
 
 export default function CustomsGap({ gaps, stamp }) {
   const { meta } = gaps;
   const years = meta.years || [];
-  const [tab, setTab] = useState("products");
+  const [tab, setTab] = useState("worklist");
   const [year, setYear] = useState(String(meta.base_year ?? years[years.length - 1]));
   const [focus, setFocus] = useState(null);
 
@@ -107,8 +111,9 @@ export default function CustomsGap({ gaps, stamp }) {
         </div>
       </nav>
 
+      {tab === "worklist" && <Worklist year={year} yearControl={yearControl} onOpenProducts={openProducts} />}
       {tab === "products" && <Products defaultYear={productYear} focus={focus} vatRate={meta.vat_rate} />}
-      {tab !== "products" && tab !== "method" && loadingCorridors && (
+      {!["products", "method", "worklist"].includes(tab) && loadingCorridors && (
         <div aria-busy="true" aria-label="Loading corridors">
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
             {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[92px]" />)}
