@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Panel, PanelHead, Eyebrow } from "@/components/ui";
 
 const STARTERS = [
@@ -9,55 +9,6 @@ const STARTERS = [
   "Which headings gap in both years, and why does that matter?",
   "What is the total VAT at risk — and how solid is that number?",
 ];
-
-/**
- * Compact slice of the mirror dataset sent to the model. Keeping this small and
- * explicit is what stops the Detective from inventing figures — it may only cite
- * what appears here.
- */
-function buildContext(data) {
-  if (!data) return null;
-  const { meta, totals, sig_counts, corridors = [] } = data;
-  return {
-    meta: {
-      demo: meta.demo,
-      year: meta.year,
-      cif_factor: meta.cif_factor,
-      vat_rate: meta.vat_rate,
-      reporters: meta.reporters,
-      signatures: meta.signatures,
-      source: meta.source,
-      coverage: meta.coverage,
-      quantity_available: meta.quantity_available,
-      quantity_note: meta.quantity_note,
-      diagnostics: meta.diagnostics,
-      estimate: meta.estimate?.years,
-    },
-    totals,
-    sig_counts,
-    corridors: corridors.slice(0, 60).map((c) => ({
-      partner: c.partnerName,
-      hs4: c.hs4,
-      chapter: c.chapter,
-      label: c.label,
-      partner_cif: c.x_cif,
-      lebanon: c.m,
-      gap: c.gap,
-      gap_pct: c.gap_pct,
-      qty_gap_pct: c.qty_gap_pct,
-      year: c.year,
-      cover: c.cover,
-      signature: c.signature,
-      shortfall: c.shortfall,
-      vat_floor: c.vat_floor,
-      duty_loss: c.duty_loss,
-      fiscal_loss: c.fiscal_loss,
-      outflow: c.outflow,
-      persistent: c.persistent,
-      confidence: c.confidence,
-    })),
-  };
-}
 
 /** Minimal markdown: **bold** and line breaks. Nothing else is trusted through. */
 function MessageText({ text }) {
@@ -80,8 +31,7 @@ function MessageText({ text }) {
   );
 }
 
-export default function TradeDetective({ data, yearControl }) {
-  const context = useMemo(() => buildContext(data), [data]);
+export default function TradeDetective({ data, year, yearControl }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -105,7 +55,7 @@ export default function TradeDetective({ data, yearControl }) {
       const res = await fetch("/api/detective", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next, context }),
+        body: JSON.stringify({ messages: next, year }),
       });
       const ct = res.headers.get("content-type") || "";
       if (!res.ok || ct.includes("application/json")) {

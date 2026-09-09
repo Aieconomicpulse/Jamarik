@@ -1,10 +1,33 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { COOKIE_NAME, verifySession } from "@/lib/auth";
+import { loadGaps } from "@/lib/data";
+import { sliceFor, detectiveContext } from "@/lib/slice";
 
 // The Trade Detective — a Claude-powered forensic investigator for Jamarik.
-// The client posts { messages, context } where `context` is a compact slice of
-// data/mirror_gaps.json (totals, signature counts, meta, top corridors). We
-// ground Claude strictly in that context and stream the answer back as plain
-// text. The middleware has already checked the session before we get here.
+// The client posts { messages, year }. The grounding — a compact slice of
+// data/mirror_gaps.json for that year — is built HERE, from the server's own
+// copy of the data, never from anything the client sends: a client-supplied
+// context would be a prompt injection into the model's only source of facts.
+// The answer streams back as plain text. The middleware has already checked
+// the session before we get here.
+
+// Best-effort limiter: 30 questions per user per hour, per instance. Serverless
+// instances are short-lived, so this is a speed bump; Vercel KV / Upstash is
+// the durable option when the portal is shared more widely.
+const hits = new Map();
+const WINDOW_MS = 60 * 60 * 1000;
+const MAX_PER_WINDOW = 30;
+
+function limited(user) {
+  const now = Date.now();
+  const rec = hits.get(user);
+  if (!rec || now - rec.first > WINDOW_MS) {
+    hits.set(user, { first: now, count: 1 });
+    return false;
+  }
+  rec.count += 1;
+  return rec.count > MAX_PER_WINDOW;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,7 +76,16 @@ export async function POST(req) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { messages, context } = body || {};
+  if (body && Object.prototype.hasOwnProperty.call(body, "context")) {
+    return Response.json({ error: "The Detective builds its own data context; do not send one." }, { status: 400 });
+  }
+  const session = await verifySession(req.cookies.get(COOKIE_NAME)?.value);
+  const user = session?.u || "anonymous";
+  if (limited(user)) {
+    return Response.json({ error: "Thirty questions an hour is the limit — try again a little later." }, { status: 429 });
+  }
+
+  const { messages, year } = body || {};
   const clean = (Array.isArray(messages) ? messages : [])
     .filter(
       (m) =>
@@ -74,6 +106,9 @@ export async function POST(req) {
       { status: 503 }
     );
   }
+
+  const gaps = await loadGaps();
+  const context = detectiveContext(sliceFor(gaps, year === "all" || year == null ? "all" : Number(year)));
 
   const client = new Anthropic();
   const encoder = new TextEncoder();

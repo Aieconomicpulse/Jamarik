@@ -76,8 +76,15 @@ but a fresh deploy is the cleanest way to pick them up.
   `SameSite=Lax` session cookie, valid 12 hours.
 - Tampered or expired cookies fail signature verification and bounce to `/login`.
 - API routes return a JSON `401` rather than an HTML redirect.
-- Login attempts are throttled per IP (10 per 10 minutes, best-effort in a
-  serverless environment).
+- Login attempts are throttled per IP (10 per 10 minutes) and Detective
+  questions per user (30 per hour). Both are per-instance and best-effort in a
+  serverless environment; Vercel KV / Upstash is the durable option.
+- **Fail-closed.** In production the app throws if `PORTAL_USER`,
+  `PORTAL_PASSWORD` or `SESSION_SECRET` is unset — there is no default login
+  and no secret derived from the password. The development fallbacks apply
+  only when `NODE_ENV` is not `production`.
+- The Detective's data context is built on the server from the portal's own
+  copy of the data; a request that carries its own `context` is refused.
 - The whole site sends `X-Robots-Tag: noindex, nofollow` and a strict CSP.
 
 To rotate the password, change `PORTAL_PASSWORD` in Vercel. Changing

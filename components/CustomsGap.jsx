@@ -6,7 +6,7 @@ import Analytics from "@/components/Analytics";
 import GapForensics from "@/components/GapForensics";
 import TradeDetective from "@/components/TradeDetective";
 import Method from "@/components/Method";
-import { summary } from "@/lib/losses";
+import { sliceFor } from "@/lib/slice";
 import { Icon, Segmented } from "@/components/ui";
 
 // Products leads: one partner, one year, every product — exported, registered,
@@ -28,40 +28,9 @@ export default function CustomsGap({ gaps, stamp }) {
   const [year, setYear] = useState(String(meta.base_year ?? years[years.length - 1]));
   const [focus, setFocus] = useState(null);
 
-  const scope = useMemo(
-    () => (year === "all" ? corridors : corridors.filter((c) => c.year === Number(year))),
-    [corridors, year]
-  );
-
-  // The older components each take a single-year-shaped object. Building it here
-  // keeps the year switch in one place instead of threading it through all of them.
-  const slice = useMemo(() => {
-    const s = summary(scope);
-    const partners = year === "all"
-      ? meta.comparable_partners
-      : (gaps.years?.[year]?.partners ?? meta.comparable_partners);
-    return {
-      meta: {
-        ...meta,
-        year: year === "all" ? `${years[0]}–${years[years.length - 1]}` : Number(year),
-        reporters: (partners || []).map((p) => ({ ...p, has_data: true })),
-      },
-      corridors: scope,
-      totals: {
-        x_cif: s.tradeValue,
-        m: s.declared,
-        gap_pos: s.shortfall,
-        vat_floor: s.vat,
-        duty_loss: s.duty,
-      },
-      sig_counts: {
-        under_invoicing: s.under.count,
-        value_gap: s.unrecorded.count,
-        over_invoicing: s.over.count,
-        normal: s.normal,
-      },
-    };
-  }, [scope, meta, gaps.years, year, years]);
+  // One year (or both) of the corridor file, shaped for the tabs. The same
+  // function builds the Detective's grounding on the server.
+  const slice = useMemo(() => sliceFor(gaps, year), [gaps, year]);
 
   const productYear = year === "all" ? meta.base_year : Number(year);
 

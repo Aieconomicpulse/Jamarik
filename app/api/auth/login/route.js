@@ -5,7 +5,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Small in-memory throttle. Serverless instances are short-lived, so this is a
-// speed bump against casual guessing, not a substitute for a real rate limiter.
+// speed bump against casual guessing, not a substitute for a real rate limiter;
+// Vercel KV / Upstash is the durable option.
 const attempts = new Map();
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
