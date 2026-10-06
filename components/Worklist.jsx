@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { money } from "@/lib/format";
+import { errorFrom } from "@/lib/http";
 import { Button, Chip, Panel, PanelHead, Select, Skeleton } from "@/components/ui";
 
 // The action surface: the corridors to open first, each with its evidence
@@ -9,7 +10,7 @@ import { Button, Chip, Panel, PanelHead, Select, Skeleton } from "@/components/u
 // in the worklist database, so they survive a reload and are shared.
 
 const RUNG_TONE = { strong: "burgundy", probable: "gold", verify: "neutral" };
-const SIG_TONE = { under_invoicing: "burgundy", value_gap: "gold" };
+const SIG_TONE = { under_invoicing: "amber", value_gap: "crimson" };
 const STATUSES = [["new", "New"], ["review", "In review"], ["audited", "Audited"], ["recovered", "Recovered"]];
 
 export default function Worklist({ year, yearControl, onOpenProducts }) {
@@ -34,7 +35,7 @@ export default function Worklist({ year, yearControl, onOpenProducts }) {
     if (!year || year === "all") return;
     setData(null); setError(null);
     fetch(`/api/worklist?year=${year}&partner=${partner}`, { cache: "no-store" })
-      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || r.statusText); return r.json(); })
+      .then(async (r) => { if (!r.ok) throw new Error(await errorFrom(r)); return r.json(); })
       .then(setData)
       .catch((e) => setError(e.message));
   }, [year, partner]);
@@ -46,7 +47,7 @@ export default function Worklist({ year, yearControl, onOpenProducts }) {
     setData((d) => ({ ...d, items: d.items.map((x) => (x.id === item.id ? { ...x, ...next } : x)) }));
     try {
       const r = await fetch(`/api/worklist/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
-      if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+      if (!r.ok) throw new Error(await errorFrom(r));
       const { item: stored } = await r.json();
       setData((d) => ({ ...d, items: d.items.map((x) => (x.id === item.id ? { ...x, ...stored, id: x.id } : x)) }));
       setSaving((s) => ({ ...s, [item.id]: "saved" }));

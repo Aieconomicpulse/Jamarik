@@ -105,6 +105,36 @@ through Node's built-in driver on-prem, Postgres behind `DATABASE_URL` in the
 cloud (driver not wired yet). The Detective tab stays available behind a flag:
 `NEXT_PUBLIC_DETECTIVE=off` hides it.
 
+## Live data
+
+The tab beside the worklist. It lists the countries in `config/live_sources.json`,
+each marked Connected or No link. A click retrieves what that country's
+connection holds now, through `/api/live/<code>`. There are two kinds of connection,
+both set on the server and never by the browser:
+
+- **Uploaded files.** On the country's screen, anyone signed in can upload CSV,
+  Excel, JSON, text or HTML files (up to 10 MB each, 50 per country) by button
+  or drag and drop, and remove them again. They are stored in
+  `data/live/<code>/` and gitignored; see `data/live/README.md`.
+- **A feed**: a `connector` of type `http` in the config, whose URL and headers
+  are read from the environment variables it names.
+
+Tables are shown exactly as received. Other documents are read by Claude
+(`LIVE_MODEL`, falling back to `DETECTIVE_MODEL`), which must copy every figure
+together with the line it came from. `lib/live/verify.js` then checks on the
+server that the line is in the document and the figure is in the line. Anything
+that fails is rejected and never shown; only its label and the reason are.
+Numbers are parsed from the copied text by code, never by the model. A
+figure must sit on its own quoted line. Context (the period or HS code) may
+come from elsewhere in the same document, where it is flagged; context the
+document does not contain is removed.
+
+**Example mode.** A switch at the top of the tab, `Live sources | Example`,
+moves the whole tab onto sample files in `samples/live/` (see the README
+there). It is bannered, read-only (the upload route refuses it), and keeps its
+results apart from live ones. As in live mode, nothing on this tab feeds
+any other tab.
+
 ## The data
 
 Two JSON files in `/data`, built by `pipeline/build_mirror.py` from UN Comtrade

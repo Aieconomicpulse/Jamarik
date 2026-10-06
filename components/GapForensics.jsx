@@ -4,13 +4,15 @@ import { useMemo, useState } from "react";
 import { money, pct } from "@/lib/format";
 import { Chip, Panel, Select } from "@/components/ui";
 
-// Signature → chip colour. Under-invoicing reads as the value crime (burgundy),
-// normal asymmetry as healthy (cedar); everything else stays quiet.
+// Signature → chip colour, the same red-orange-green reading scale as
+// Products, Corridors and Method: largely unrecorded is worst (crimson),
+// under-declared is the firmer but smaller claim (amber), normal asymmetry
+// is healthy (cedar); everything else stays quiet.
 const SIG_TONE = {
-  under_invoicing: "burgundy",
+  under_invoicing: "amber",
   over_invoicing: "neutral",
   not_in_partner: "neutral",
-  value_gap: "neutral",
+  value_gap: "crimson",
   normal: "cedar",
   exempt: "neutral",
   structural: "sea",
@@ -97,14 +99,14 @@ export default function GapForensics({ data, onOpenProducts, yearControl }) {
           <table className="dt">
             <thead>
               <tr>
-                <th>Partner</th>
-                <th>Corridor</th>
-                <th className="text-right">Partner (CIF-adj.)</th>
-                <th className="text-right">Lebanon</th>
-                <th className="text-right">Gap</th>
-                <th className="text-right">Gap %</th>
-                <th>Signature</th>
-                <th className="text-right">VAT floor</th>
+                <th className="!text-center">Partner</th>
+                <th className="!text-center">Corridor</th>
+                <th className="!text-center">Partner (CIF-adj.)</th>
+                <th className="!text-center">Lebanon</th>
+                <th className="!text-center">Gap</th>
+                <th className="!text-center">Gap %</th>
+                <th className="!text-center">Signature</th>
+                <th className="!text-center">VAT floor</th>
               </tr>
             </thead>
             <tbody>
@@ -112,23 +114,23 @@ export default function GapForensics({ data, onOpenProducts, yearControl }) {
                 <tr key={`${c.partner}-${c.hs4}`} className={onOpenProducts ? "cursor-pointer" : ""}
                   onClick={() => onOpenProducts?.({ partner: c.partner, chapter: c.hs2, hs4: c.hs4 })}
                   title="Open this heading product by product">
-                  <td className="whitespace-nowrap">{c.partnerName}</td>
-                  <td>
+                  <td className="text-center whitespace-nowrap">{c.partnerName}</td>
+                  <td className="text-center">
                     <div className="num text-[12px] text-slate1">{c.label}</div>
-                    <div className="text-[13px] leading-snug max-w-[340px]">{c.chapter}</div>
+                    <div className="text-[13px] leading-snug max-w-[340px] mx-auto">{c.chapter}</div>
                   </td>
-                  <td className="text-right num">{money(c.x_cif)}</td>
-                  <td className="text-right num">{money(c.m)}</td>
-                  <td className={`text-right num ${c.gap > 0 ? "text-burgundy" : "text-slate1"}`}>
+                  <td className="text-center num">{money(c.x_cif)}</td>
+                  <td className="text-center num">{money(c.m)}</td>
+                  <td className={`text-center num ${c.gap > 0 ? "text-burgundy" : "text-slate1"}`}>
                     {money(c.gap)}
                   </td>
-                  <td className="text-right num">{pct(c.gap_pct)}</td>
-                  <td>
+                  <td className="text-center num">{pct(c.gap_pct)}</td>
+                  <td className="text-center">
                     <Chip tone={SIG_TONE[c.signature]}>
                       {meta.signatures[c.signature] ?? c.signature}
                     </Chip>
                   </td>
-                  <td className="text-right num text-gold">{money(c.vat_floor)}</td>
+                  <td className="text-center num text-gold">{money(c.vat_floor)}</td>
                 </tr>
               ))}
               {rows.length === 0 && (

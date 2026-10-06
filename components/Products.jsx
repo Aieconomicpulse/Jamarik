@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { money } from "@/lib/format";
+import { errorFrom } from "@/lib/http";
 import { ABSENT_RATIO, LOSS_BY_KEY, REVENUE_READINGS, classifyCover } from "@/lib/losses";
-import { Bar, Button, Chip, Icon, Input, Panel, Segmented, Select, Skeleton, Tile } from "@/components/ui";
+import { Bar, Button, Chip, Icon, Input, Panel, Segmented, Select, Skeleton, Ticker, Tile } from "@/components/ui";
 
 // Product by product. What the partner says it exported to Lebanon, what
 // Lebanon registered, the difference, and the VAT that difference cost —
@@ -13,9 +14,9 @@ import { Bar, Button, Chip, Icon, Input, Panel, Segmented, Select, Skeleton, Til
 // route is backed by a live feed instead of a file. Refresh re-asks the API.
 
 const READING = {
-  under_invoicing: { label: "Under-declared", tone: "burgundy" },
-  value_gap: { label: "Largely unrecorded", tone: "gold" },
-  not_in_lebanon: { label: "Not registered", tone: "gold" },
+  under_invoicing: { label: "Under-declared", tone: "amber" },
+  value_gap: { label: "Largely unrecorded", tone: "crimson" },
+  not_in_lebanon: { label: "Not registered", tone: "crimson" },
   over_invoicing: { label: "Lebanon declares more", tone: "neutral" },
   normal: { label: "Matches", tone: "cedar" },
   not_in_partner: { label: "Only in Lebanon's books", tone: "neutral" },
@@ -33,7 +34,7 @@ const BASIS = {
 };
 
 const BAR_TONE = {
-  under_invoicing: "burgundy", value_gap: "sea", not_in_lebanon: "sea",
+  under_invoicing: "amber", value_gap: "crimson", not_in_lebanon: "crimson",
   over_invoicing: "slate", normal: "cedar", not_in_partner: "slate", exempt: "slate", structural: "sea",
 };
 
@@ -147,7 +148,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
     if (!year || !partner) return;
     setLoading(true); setError(null);
     fetch(`/api/mirror?year=${year}&partner=${partner}`, { cache: "no-store" })
-      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || r.statusText); return r.json(); })
+      .then(async (r) => { if (!r.ok) throw new Error(await errorFrom(r)); return r.json(); })
       .then((d) => { setData(d); setFetchedAt(new Date()); setLimit(PAGE); setOpen(null); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -332,8 +333,8 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             </div>
           </details>
 
-          {/* Match quality — the honesty strip */}
-          <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-[11.5px] text-slate1 mb-6">
+          {/* Match quality — the honesty strip, as a continuously scrolling ticker */}
+          <Ticker className="mb-6">
             <span><span className="text-ink num">{s.lines.toLocaleString()}</span> product lines</span>
             <span><span className="text-ink num">{s.matched.toLocaleString()}</span> paired on HS 2017</span>
             {basis && <span title={basis.title}>partner figure: <span className="text-ink">{basis.label}</span>{s.rx > 0 && <span className="text-slate2"> · {money(s.rx)} re-exports set aside</span>}</span>}
@@ -342,7 +343,7 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
             {(s.by_map?.unmapped ?? 0) > 0 && <span><span className="text-burgundy num">{s.by_map.unmapped}</span> unmapped</span>}
             <span><span className="text-ink num">{s.partner_only.toLocaleString()}</span> only in {many ? "partner" : `${name}'s`} records</span>
             <span><span className="text-ink num">{s.lebanon_only.toLocaleString()}</span> only in Lebanon&apos;s</span>
-          </div>
+          </Ticker>
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -362,13 +363,13 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
               <table className="dt">
                 <thead>
                   <tr>
-                    <Th k="code" sort={sort} onSort={onSort}>Product</Th>
-                    {many && <th>Partners</th>}
-                    <Th k="partner" sort={sort} onSort={onSort} right>{many ? "Partners" : name} exported</Th>
-                    <Th k="lebanon" sort={sort} onSort={onSort} right>Lebanon registered</Th>
-                    <Th k="gap" sort={sort} onSort={onSort} right>Difference</Th>
-                    <Th k="vat" sort={sort} onSort={onSort} right>VAT lost</Th>
-                    <th>Reading</th>
+                    <Th k="code" sort={sort} onSort={onSort} left>Product</Th>
+                    {many && <th className="!text-center">Partners</th>}
+                    <Th k="partner" sort={sort} onSort={onSort}>{many ? "Partners" : name} exported</Th>
+                    <Th k="lebanon" sort={sort} onSort={onSort}>Lebanon registered</Th>
+                    <Th k="gap" sort={sort} onSort={onSort}>Difference</Th>
+                    <Th k="vat" sort={sort} onSort={onSort}>VAT lost</Th>
+                    <th className="!text-center">Reading</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -402,16 +403,16 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
                           </div>
                           <div className="text-[13px] text-ink2 leading-snug">{r.name}</div>
                         </td>
-                        {many && <td className="num text-[12px] text-slate1">{[...r.partners].map((p) => avail?.partners?.[year]?.find((x) => x.code === p)?.name ?? p).join(", ")}</td>}
-                        <td className="text-right num">{r.xc ? money(r.xc) : <span className="text-slate2">—</span>}</td>
-                        <td className="text-right num">
+                        {many && <td className="text-center num text-[12px] text-slate1">{[...r.partners].map((p) => avail?.partners?.[year]?.find((x) => x.code === p)?.name ?? p).join(", ")}</td>}
+                        <td className="text-center num">{r.xc ? money(r.xc) : <span className="text-slate2">—</span>}</td>
+                        <td className="text-center num">
                           {r.m ? money(r.m) : <span className="text-slate2">—</span>}
-                          <Bar value={r.cv ?? 0} tone={BAR_TONE[r.rd] || "slate"} className="!w-20 ml-auto mt-1.5"
+                          <Bar value={r.cv ?? 0} tone={BAR_TONE[r.rd] || "slate"} className="!w-20 mx-auto mt-1.5"
                             title={r.cv == null ? "" : `${Math.round(r.cv * 100)}% of the partner figure`} />
                         </td>
-                        <td className={`text-right num ${r.g > 0 ? "text-burgundy" : "text-slate1"}`}>{money(r.g)}</td>
-                        <td className="text-right num text-gold">{r.vat ? money(r.vat) : <span className="text-slate2">—</span>}</td>
-                        <td><Chip tone={rd.tone}>{rd.label}</Chip></td>
+                        <td className={`text-center num ${r.g > 0 ? "text-burgundy" : "text-slate1"}`}>{money(r.g)}</td>
+                        <td className="text-center num text-gold">{r.vat ? money(r.vat) : <span className="text-slate2">—</span>}</td>
+                        <td className="text-center"><Chip tone={rd.tone}>{rd.label}</Chip></td>
                       </tr>,
                       isOpen && (
                         <tr key={`${r.key}-detail`} className="[&>td]:bg-bone2/50 [&>td]:shadow-[inset_3px_0_0_#8a6714]">
@@ -456,10 +457,10 @@ export default function Products({ defaultYear, focus, vatRate = 0.11 }) {
   );
 }
 
-function Th({ k, sort, onSort, right, children }) {
+function Th({ k, sort, onSort, left, children }) {
   const active = sort.key === k;
   return (
-    <th className={right ? "!text-right" : ""}>
+    <th className={left ? "" : "!text-center"}>
       <button onClick={() => onSort(k)}
         className={`num text-[10.5px] tracking-[0.12em] uppercase transition-colors ${active ? "text-gold" : "hover:text-ink"}`}
         title="Sort by this column">

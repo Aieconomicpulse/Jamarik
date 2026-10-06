@@ -13,7 +13,6 @@ const small = (v) => (v ? (v < 1e4 ? <span className="text-slate2">&lt;$10K</spa
 export default function Method({ meta, stamp }) {
   return (
     <div className="fade-in">
-      <div className="max-w-5xl">
       <Panel className="mb-6">
         <PanelHead title="What the portal compares" />
         <div className="px-5 py-4 text-[13.5px] text-ink2 leading-relaxed space-y-3">
@@ -63,16 +62,16 @@ export default function Method({ meta, stamp }) {
           <PanelHead title="The estimate" sub="The number to quote: HS-4 corridors, corrected for the noise two customs services produce on their own" />
           <div className="overflow-x-auto">
             <table className="dt">
-              <thead><tr><th>Year</th><th className="text-right">Gross (uncorrected)</th><th className="text-right">Central estimate</th><th className="text-right">90% range</th><th className="text-right">Floor</th><th className="text-right">Flagged corridors</th></tr></thead>
+              <thead><tr><th className="!text-center">Year</th><th className="!text-center">Gross (uncorrected)</th><th className="!text-center">Central estimate</th><th className="!text-center">90% range</th><th className="!text-center">Floor</th><th className="!text-center">Flagged corridors</th></tr></thead>
               <tbody>
                 {Object.entries(meta.estimate.years).map(([y, v]) => (
                   <tr key={y}>
-                    <td className="num">{y}</td>
-                    <td className="text-right num">{money(v.gross)}</td>
-                    <td className="text-right num text-gold">{money(v.central)}</td>
-                    <td className="text-right num">{money(v.lo)} – {money(v.hi)}</td>
-                    <td className="text-right num">{money(v.floor)}</td>
-                    <td className="text-right num">{v.flagged}</td>
+                    <td className="text-center num">{y}</td>
+                    <td className="text-center num">{money(v.gross)}</td>
+                    <td className="text-center num text-gold">{money(v.central)}</td>
+                    <td className="text-center num">{money(v.lo)} – {money(v.hi)}</td>
+                    <td className="text-center num">{money(v.floor)}</td>
+                    <td className="text-center num">{v.flagged}</td>
                   </tr>
                 ))}
               </tbody>
@@ -101,11 +100,8 @@ export default function Method({ meta, stamp }) {
         </dl>
       </Panel>
 
-      </div>
-
       {meta.validation && <Validation v={meta.validation} />}
 
-      <div className="max-w-5xl">
       <Panel>
         <PanelHead title="Going live" sub={stamp?.live ? "This portal is reading live data" : `This portal is reading a snapshot built ${stamp?.generated ?? meta.generated}`} />
         <div className="px-5 py-4 text-[13px] text-ink2 leading-relaxed space-y-3">
@@ -127,7 +123,6 @@ export default function Method({ meta, stamp }) {
           </dl>
         </div>
       </Panel>
-      </div>
     </div>
   );
 }
@@ -149,15 +144,15 @@ function Validation({ v }) {
       </div>
       <div className="overflow-x-auto">
         <table className="dt">
-          <thead><tr><th>Year</th><th>File</th><th>Flow</th><th>Partner</th><th className="text-right">HS-6 lines</th><th className="text-right">Sum of lines used</th><th className="text-right">File&apos;s own TOTAL row</th><th className="text-right">Ratio</th></tr></thead>
+          <thead><tr><th className="!text-center">Year</th><th className="!text-center">File</th><th className="!text-center">Flow</th><th className="!text-center">Partner</th><th className="!text-center">HS-6 lines</th><th className="!text-center">Sum of lines used</th><th className="!text-center">File&apos;s own TOTAL row</th><th className="!text-center">Ratio</th></tr></thead>
           <tbody>
             {v.reconciliation.map((r, i) => (
               <tr key={i}>
-                <td className="num">{r.year}</td><td>{r.reporter}</td><td className="num">{r.flow === "X" ? "exports" : "imports"}</td><td>{r.partner}</td>
-                <td className="text-right num">{r.lines == null ? "—" : r.lines.toLocaleString()}</td>
-                <td className="text-right num">{money(r.hs6_sum)}</td>
-                <td className="text-right num">{r.total_row == null ? "—" : money(r.total_row)}</td>
-                <td className={`text-right num ${ok(r) ? "text-cedar" : "text-burgundy"}`}>{r.ratio == null ? "—" : r.ratio.toFixed(4)}</td>
+                <td className="text-center num">{r.year}</td><td className="text-center">{r.reporter}</td><td className="text-center num">{r.flow === "X" ? "exports" : "imports"}</td><td className="text-center">{r.partner}</td>
+                <td className="text-center num">{r.lines == null ? "—" : r.lines.toLocaleString()}</td>
+                <td className="text-center num">{money(r.hs6_sum)}</td>
+                <td className="text-center num">{r.total_row == null ? "—" : money(r.total_row)}</td>
+                <td className={`text-center num ${ok(r) ? "text-cedar" : "text-burgundy"}`}>{r.ratio == null ? "—" : r.ratio.toFixed(4)}</td>
               </tr>
             ))}
           </tbody>
@@ -167,14 +162,14 @@ function Validation({ v }) {
       <div className="px-5 pt-5 pb-2 text-[13px] text-ink">2 · Against published figures</div>
       <div className="overflow-x-auto">
         <table className="dt">
-          <thead><tr><th>Figure</th><th>Year</th><th className="text-right">This build</th><th className="text-right">Published</th><th className="text-right">Difference</th><th>Source</th></tr></thead>
+          <thead><tr><th className="!text-center">Figure</th><th className="!text-center">Year</th><th className="!text-center">This build</th><th className="!text-center">Published</th><th className="!text-center">Difference</th><th className="!text-center">Source</th></tr></thead>
           <tbody>
             {v.external.map((e, i) => (
               <tr key={i}>
-                <td>{e.figure}</td><td className="num">{e.year}</td>
-                <td className="text-right num">{money(e.ours)}</td><td className="text-right num">{money(e.published)}</td>
-                <td className={`text-right num ${Math.abs(e.diff_pct) < 1 ? "text-cedar" : "text-burgundy"}`}>{e.diff_pct > 0 ? "+" : ""}{e.diff_pct.toFixed(2)}%</td>
-                <td className="text-[12px] text-slate1">{e.source}</td>
+                <td className="text-center">{e.figure}</td><td className="text-center num">{e.year}</td>
+                <td className="text-center num">{money(e.ours)}</td><td className="text-center num">{money(e.published)}</td>
+                <td className={`text-center num ${Math.abs(e.diff_pct) < 1 ? "text-cedar" : "text-burgundy"}`}>{e.diff_pct > 0 ? "+" : ""}{e.diff_pct.toFixed(2)}%</td>
+                <td className="text-center text-[12px] text-slate1">{e.source}</td>
               </tr>
             ))}
           </tbody>
@@ -184,19 +179,19 @@ function Validation({ v }) {
       <div className="px-5 pt-5 pb-2 text-[13px] text-ink">3 · Each partner-year on the basis Lebanon books it</div>
       <div className="overflow-x-auto">
         <table className="dt">
-          <thead><tr><th>Year</th><th>Partner</th><th>Partner figure</th><th className="text-right">Partner (CIF)</th><th className="text-right">Lebanon</th><th className="text-right">Ratio</th><th className="text-right">One-sided set aside</th><th className="text-right">Re-exports</th><th className="text-right">Exempt gap</th><th className="text-right">Revenue lost</th><th className="text-right">Absent from all origins</th></tr></thead>
+          <thead><tr><th className="!text-center">Year</th><th className="!text-center">Partner</th><th className="!text-center">Partner figure</th><th className="!text-center">Partner (CIF)</th><th className="!text-center">Lebanon</th><th className="!text-center">Ratio</th><th className="!text-center">One-sided set aside</th><th className="!text-center">Re-exports</th><th className="!text-center">Exempt gap</th><th className="!text-center">Revenue lost</th><th className="!text-center">Absent from all origins</th></tr></thead>
           <tbody>
             {v.partners.map((p, i) => (
               <tr key={i}>
-                <td className="num">{p.year}</td><td className="whitespace-nowrap">{p.name}</td>
-                <td className="text-[12px] text-slate1 whitespace-nowrap">{BASIS_LABEL[p.basis] ?? p.basis}</td>
-                <td className="text-right num">{money(p.x_cif)}</td><td className="text-right num">{money(p.m)}</td>
-                <td className={`text-right num ${healthy(p) ? "text-cedar" : "text-gold"}`} title={healthy(p) ? "Within the ordinary range for two customs services" : p.ratio > 1.2 ? "Lebanon books more than the partner reports sending — the partner does not report this trade by destination, or goods reach Lebanon via a hub" : "Lebanon books much less than the partner reports"}>{p.ratio == null ? "—" : p.ratio.toFixed(2)}</td>
-                <td className="text-right num" title={p.set_aside_hs4?.length ? `HS ${p.set_aside_hs4.join(", ")}` : ""}>{p.set_aside ? <span className="text-sea">{money(p.set_aside)} <span className="text-slate2">· {p.set_aside_hs4.join(", ")}</span></span> : <span className="text-slate2">—</span>}</td>
-                <td className="text-right num">{small(p.rx)}</td>
-                <td className="text-right num">{small(p.exempt_gap)}</td>
-                <td className="text-right num text-gold">{money(p.fiscal)}</td>
-                <td className="text-right num">{money(p.fiscal_absent)} <span className="text-slate2">({p.fiscal ? Math.round(100 * p.fiscal_absent / p.fiscal) : 0}%)</span></td>
+                <td className="text-center num">{p.year}</td><td className="text-center whitespace-nowrap">{p.name}</td>
+                <td className="text-center text-[12px] text-slate1 whitespace-nowrap">{BASIS_LABEL[p.basis] ?? p.basis}</td>
+                <td className="text-center num">{money(p.x_cif)}</td><td className="text-center num">{money(p.m)}</td>
+                <td className={`text-center num ${healthy(p) ? "text-cedar" : "text-gold"}`} title={healthy(p) ? "Within the ordinary range for two customs services" : p.ratio > 1.2 ? "Lebanon books more than the partner reports sending — the partner does not report this trade by destination, or goods reach Lebanon via a hub" : "Lebanon books much less than the partner reports"}>{p.ratio == null ? "—" : p.ratio.toFixed(2)}</td>
+                <td className="text-center num" title={p.set_aside_hs4?.length ? `HS ${p.set_aside_hs4.join(", ")}` : ""}>{p.set_aside ? <span className="text-sea">{money(p.set_aside)} <span className="text-slate2">· {p.set_aside_hs4.join(", ")}</span></span> : <span className="text-slate2">—</span>}</td>
+                <td className="text-center num">{small(p.rx)}</td>
+                <td className="text-center num">{small(p.exempt_gap)}</td>
+                <td className="text-center num text-gold">{money(p.fiscal)}</td>
+                <td className="text-center num">{money(p.fiscal_absent)} <span className="text-slate2">({p.fiscal ? Math.round(100 * p.fiscal_absent / p.fiscal) : 0}%)</span></td>
               </tr>
             ))}
           </tbody>

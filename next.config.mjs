@@ -29,6 +29,12 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // The Live data example files are read at runtime with fs, so the tracer
+  // cannot see them; ship them with the two routes that read them.
+  outputFileTracingIncludes: {
+    "/api/live": ["./samples/live/**/*"],
+    "/api/live/[code]": ["./samples/live/**/*"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

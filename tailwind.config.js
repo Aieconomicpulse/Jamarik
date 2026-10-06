@@ -21,9 +21,17 @@ module.exports = {
         slate2: "#7c7563", // faint text / labels — 4.6:1
         gold: "#8a6714", // revenue-at-risk accent — 5.2:1
         gold2: "#6f5210", // gold hover — deeper still
-        cedar: "#47703f", // normal / healthy — 5.7:1
-        burgundy: "#a03636", // under-invoicing / flagged — 6.8:1
-        sea: "#1f6bc4", // largely unrecorded — 5.0:1
+        cedar: "#329c1d", // normal / healthy — 3.55:1, brighter green (set for the reading gradient; below the 4.5:1 the rest of this file targets, so avoid it for small running text where contrast matters — fine for chips, bars, chart fills and large figures)
+        burgundy: "#a03636", // negative figures, errors — 6.8:1
+        sea: "#1f6bc4", // set-aside / informational — 5.0:1
+        // The reading gradient: worst to fine, red through orange to green.
+        // Largely unrecorded is the most severe (verify before treating as
+        // revenue), value under-declared is the firmer claim but a smaller
+        // one, and normal/healthy stays cedar above. Used for every
+        // signature chip, bar and chart fill so the scale reads the same way
+        // on Products, Corridors, Evidence and Method.
+        crimson: "#b3261e", // largely unrecorded — 6.5:1
+        amber: "#a85c19", // value under-declared — 5.0:1
         ground: "#f8f6ef", // page ground behind the white cards
       },
       boxShadow: {

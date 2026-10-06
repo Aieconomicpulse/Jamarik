@@ -117,6 +117,25 @@ body {
   animation: fadeUp 0.4s ease-out both;
 }
 
+/* Ticker — a stat strip that scrolls itself instead of wrapping. Its content
+   is rendered twice back to back (see the Ticker component in ui.jsx) and
+   this animation walks exactly one copy's width, so the loop has no seam. */
+.ticker-track {
+  animation: marquee 34s linear infinite;
+}
+.ticker:hover .ticker-track,
+.ticker:focus-within .ticker-track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in,
   .skeleton {

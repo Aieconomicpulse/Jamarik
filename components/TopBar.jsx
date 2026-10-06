@@ -17,7 +17,8 @@ export default function TopBar({ user, generated }) {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-rule bg-bone shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-rule bg-bone shadow-sm relative">
+      <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-crimson via-amber to-cedar opacity-70" />
       <div className="max-w-[1400px] mx-auto px-5 lg:px-10 h-14 flex items-center justify-between gap-4">
         <Wordmark small />
         <div className="flex items-center gap-5">

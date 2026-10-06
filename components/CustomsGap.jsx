@@ -7,7 +7,9 @@ import GapForensics from "@/components/GapForensics";
 import TradeDetective from "@/components/TradeDetective";
 import Method from "@/components/Method";
 import Worklist from "@/components/Worklist";
+import LiveData from "@/components/LiveData";
 import { sliceFor } from "@/lib/slice";
+import { FEATURES } from "@/lib/features";
 import { Icon, Segmented, Skeleton } from "@/components/ui";
 
 // Products leads: one partner, one year, every product — exported, registered,
@@ -17,17 +19,24 @@ import { Icon, Segmented, Skeleton } from "@/components/ui";
 // The Detective stays available behind a flag: NEXT_PUBLIC_DETECTIVE=off hides it.
 const DETECTIVE = process.env.NEXT_PUBLIC_DETECTIVE !== "off";
 const TABS = [
-  ["products", "Products", "package"],
-  ["analytics", "Corridors", "chart"],
-  ["ledger", "Evidence", "table"],
-  ...(DETECTIVE ? [["detective", "Detective", "search"]] : []),
-  ["method", "Method", "book"],
-  ["worklist", "Worklist", "tasks"],
+  ["products", "Products", "package", "Every product, partner by partner"],
+  ["analytics", "Corridors", "chart", "Shape of the shortfall by band"],
+  // Evidence and Method are switched off for now (lib/features.js, REWIRE.md).
+  ...(FEATURES.evidenceTab ? [["ledger", "Evidence", "table", "Every corridor, unranked and complete"]] : []),
+  ...(DETECTIVE ? [["detective", "Detective", "search", "Ask about the flagged corridors"]] : []),
+  ...(FEATURES.methodTab ? [["method", "Method", "book", "How the figures are built and checked"]] : []),
+  ["worklist", "Worklist", "tasks", "Open these first, tracked to close"],
+  ["live", "Live data", "globe", "Retrieve partner data on demand"],
 ];
+
+// Tailwind needs the class names written out, so the grid width is looked up.
+const TAB_COLS = { 4: "lg:grid-cols-4", 5: "lg:grid-cols-5", 6: "lg:grid-cols-6", 7: "lg:grid-cols-7" };
 
 export default function CustomsGap({ gaps, stamp }) {
   const { meta } = gaps;
   const years = meta.years || [];
+  const totalCorridors = years.reduce((s, y) => s + (gaps.years?.[y]?.corridors ?? 0), 0);
+  const partnerCount = meta.comparable_partners?.length ?? 0;
   const [tab, setTab] = useState("products");
   const [year, setYear] = useState(String(meta.base_year ?? years[years.length - 1]));
   const [focus, setFocus] = useState(null);
@@ -71,25 +80,31 @@ export default function CustomsGap({ gaps, stamp }) {
 
   return (
     <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-8">
-      <header className="mb-8 grid lg:grid-cols-[minmax(0,1fr)_380px] gap-x-12 gap-y-4 items-end fade-in">
-        <div>
-          <div className="eyebrow text-cedar mb-2.5">
-            Trade-mirror forensics · Lebanon · {years.join(" & ")}
+      <header className="mb-10 text-center fade-in">
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <span className="hidden sm:inline-block w-8 h-[3px] rounded-full bg-gradient-to-r from-transparent to-gold" aria-hidden="true" />
+          <div className="eyebrow text-gold">
+            Trade-mirror forensics · Macro intelligence
           </div>
-          <h1 className="display text-[32px] md:text-[40px] leading-[1.05] tracking-tightest text-ink">
-            What customs is not collecting
-          </h1>
+          <span className="hidden sm:inline-block w-8 h-[3px] rounded-full bg-gradient-to-l from-transparent to-gold" aria-hidden="true" />
         </div>
-        <p className="text-[13.5px] text-slate1 leading-relaxed lg:text-right">
+        <h1 className="display text-[34px] md:text-[46px] leading-[1.05] tracking-tightest text-gold2 mb-3">
+          What customs is not collecting
+        </h1>
+        <div className="eyebrow text-slate2 mb-4">
+          {totalCorridors.toLocaleString()} corridors examined · Lebanon · {years.join("–")} · {partnerCount} partners mirrored
+        </div>
+        <p className="text-[13.5px] text-slate1 leading-relaxed max-w-2xl mx-auto">
           What exporting countries say they sent to Lebanon, against what Lebanon registered.
           The difference is revenue not collected.
         </p>
       </header>
 
-      {/* Sections. The selected one is filled gold; the rest wait quietly. */}
-      <nav aria-label="Sections" className="mb-8 -mx-5 px-5 lg:mx-0 lg:px-0 overflow-x-auto">
-        <div role="tablist" className="inline-flex gap-2 p-1.5 rounded-2xl bg-bone2 border border-rule">
-          {TABS.map(([key, label, icon]) => {
+      {/* Sections, as a card grid: an icon, the name, and what it is for —
+          the selected one lifts with a gold edge; the rest wait quietly. */}
+      <nav aria-label="Sections" className="mb-10">
+        <div role="tablist" className={`grid grid-cols-2 sm:grid-cols-3 ${TAB_COLS[TABS.length] || "lg:grid-cols-7"} gap-3 md:gap-4`}>
+          {TABS.map(([key, label, icon, blurb]) => {
             const on = tab === key;
             return (
               <button
@@ -97,14 +112,15 @@ export default function CustomsGap({ gaps, stamp }) {
                 role="tab"
                 aria-selected={on}
                 onClick={() => setTab(key)}
-                className={`flex flex-col items-center justify-center gap-1.5 w-24 h-24 md:w-28 md:h-28 rounded-xl text-[13px] md:text-[14px] font-medium tracking-wide cursor-pointer whitespace-nowrap transition-colors duration-150 ${
+                className={`group flex flex-col items-center text-center gap-2 rounded-2xl border bg-bone px-4 py-6 cursor-pointer transition-all duration-200 ${
                   on
-                    ? "bg-gold text-white shadow-sm"
-                    : "text-slate1 hover:text-ink hover:bg-bone"
+                    ? "border-gold border-b-[3px] shadow-md bg-gold/5"
+                    : "border-rule shadow-sm hover:shadow-md hover:border-slate2 hover:-translate-y-0.5"
                 }`}
               >
-                <Icon name={icon} className="w-8 h-8 md:w-9 md:h-9" strokeWidth={1.6} />
-                {label}
+                <Icon name={icon} className={`w-7 h-7 transition-colors duration-200 ${on ? "text-gold" : "text-slate1 group-hover:text-ink"}`} strokeWidth={1.6} />
+                <div className={`text-[13px] font-semibold tracking-wide ${on ? "text-ink" : "text-ink2"}`}>{label}</div>
+                <div className="text-[10.5px] text-slate2 leading-snug">{blurb}</div>
               </button>
             );
           })}
@@ -113,7 +129,7 @@ export default function CustomsGap({ gaps, stamp }) {
 
       {tab === "worklist" && <Worklist year={year} yearControl={yearControl} onOpenProducts={openProducts} />}
       {tab === "products" && <Products defaultYear={productYear} focus={focus} vatRate={meta.vat_rate} />}
-      {!["products", "method", "worklist"].includes(tab) && loadingCorridors && (
+      {!["products", "method", "worklist", "live"].includes(tab) && loadingCorridors && (
         <div aria-busy="true" aria-label="Loading corridors">
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
             {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[92px]" />)}
@@ -124,9 +140,10 @@ export default function CustomsGap({ gaps, stamp }) {
       {tab === "analytics" && !loadingCorridors && (
         <Analytics data={slice} year={year} onOpenProducts={openProducts} yearControl={yearControl} />
       )}
-      {tab === "ledger" && !loadingCorridors && <GapForensics data={slice} year={year} onOpenProducts={openProducts} yearControl={yearControl} />}
+      {FEATURES.evidenceTab && tab === "ledger" && !loadingCorridors && <GapForensics data={slice} year={year} onOpenProducts={openProducts} yearControl={yearControl} />}
       {tab === "detective" && !loadingCorridors && <TradeDetective data={slice} year={year} yearControl={yearControl} />}
-      {tab === "method" && <Method meta={meta} stamp={stamp} />}
+      {FEATURES.methodTab && tab === "method" && <Method meta={meta} stamp={stamp} />}
+      {tab === "live" && <LiveData />}
     </div>
   );
 }

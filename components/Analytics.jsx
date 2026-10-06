@@ -11,19 +11,19 @@ import { Bar, Panel, PanelHead, Segmented, Tile } from "@/components/ui";
 const AXIS = "#7c7563";
 const GRID = "rgba(222,217,202,0.9)";
 
-// Cover bands, low to high. Colour carries the reading; the label carries it too.
-// Evidence rung → chip colour: the more tests a corridor passes, the warmer.
-
+// Cover bands, low to high. A five-colour sequence, deepest where Lebanon
+// recorded far less than the partner (the harmful end) and calmer as the record
+// improves: maroon, red, orange, terracotta, blush. Labels and the tooltip
+// carry the reading too.
 const BANDS = [
-  { lo: 0.0, hi: 0.2, label: "0–20%", fill: "#1f6bc4", reading: "unrecorded" },
-  { lo: 0.2, hi: 0.4, label: "20–40%", fill: "#1f6bc4", reading: "unrecorded" },
-  { lo: 0.4, hi: 0.6, label: "40–60%", fill: "#a03636", reading: "under-declared" },
-  { lo: 0.6, hi: 0.85, label: "60–85%", fill: "#a03636", reading: "under-declared" },
-  { lo: 0.85, hi: 1.15, label: "85–115%", fill: "#a9a394", reading: "normal" },
-  { lo: 1.15, hi: 1.6, label: "115–160%", fill: "#a9a394", reading: "normal" },
-  { lo: 1.6, hi: 99, label: "> 160%", fill: "#6b6555", reading: "Lebanon more" },
+  { lo: 0.0, hi: 0.2, label: "0–20%", fill: "#7b0000", reading: "unrecorded" },
+  { lo: 0.2, hi: 0.4, label: "20–40%", fill: "#c41c04", reading: "unrecorded" },
+  { lo: 0.4, hi: 0.6, label: "40–60%", fill: "#e8731a", reading: "under-declared" },
+  { lo: 0.6, hi: 0.85, label: "60–85%", fill: "#e8731a", reading: "under-declared" },
+  { lo: 0.85, hi: 1.15, label: "85–115%", fill: "#d08068", reading: "normal" },
+  { lo: 1.15, hi: 1.6, label: "115–160%", fill: "#d08068", reading: "normal" },
+  { lo: 1.6, hi: 99, label: "> 160%", fill: "#eaccbf", reading: "Lebanon more" },
 ];
-
 
 export default function Analytics({ data, year, onOpenProducts, yearControl }) {
   const { meta, corridors = [] } = data;
@@ -75,8 +75,8 @@ export default function Analytics({ data, year, onOpenProducts, yearControl }) {
             <Tile label="of which VAT" value={money(s.fiscal ? s.vat * est.central / s.fiscal : 0)} sub="scaled to the estimate" />
             <Tile label="of which duty (indicative)" value={money(s.fiscal ? s.duty * est.central / s.fiscal : 0)} sub="scaled to the estimate" />
             <Tile label="Corridors flagged" value={`${s.under.count + s.unrecorded.count} · ${pct(flaggedShare * 100, 0)}`} />
-            <Tile label="Under-declared" value={money(s.under.corrected)} tone="burgundy" sub={`gross ${money(s.under.fiscal)}`} />
-            <Tile label="Unrecorded · verify" value={money(s.unrecorded.corrected)} tone="sea" sub={`gross ${money(s.unrecorded.fiscal)}`} />
+            <Tile label="Under-declared" value={money(s.under.corrected)} tone="amber" sub={`gross ${money(s.under.fiscal)}`} />
+            <Tile label="Unrecorded · verify" value={money(s.unrecorded.corrected)} tone="crimson" sub={`gross ${money(s.unrecorded.fiscal)}`} />
           </>
         ) : (
           <>
@@ -84,8 +84,8 @@ export default function Analytics({ data, year, onOpenProducts, yearControl }) {
             <Tile label="of which VAT" value={money(s.vat)} />
             <Tile label="of which duty (indicative)" value={money(s.duty)} />
             <Tile label="Corridors flagged" value={`${s.under.count + s.unrecorded.count} · ${pct(flaggedShare * 100, 0)}`} />
-            <Tile label="Under-declared" value={money(s.under.fiscal)} tone="burgundy" />
-            <Tile label="Unrecorded · verify" value={money(s.unrecorded.fiscal)} tone="sea" />
+            <Tile label="Under-declared" value={money(s.under.fiscal)} tone="amber" />
+            <Tile label="Unrecorded · verify" value={money(s.unrecorded.fiscal)} tone="crimson" />
           </>
         )}
       </div>
@@ -119,10 +119,10 @@ export default function Analytics({ data, year, onOpenProducts, yearControl }) {
             </BarChart>
           </ResponsiveContainer>
           <div className="flex flex-wrap gap-x-6 gap-y-1 px-2 mt-1 text-[11px] num">
-            <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#1f6bc4" }} />largely unrecorded</span>
-            <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#a03636" }} />value under-declared</span>
-            <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#a9a394" }} />within normal</span>
-            <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#6b6555" }} />Lebanon declares more</span>
+            <span><i className="inline-block w-2.5 h-2.5 align-middle" style={{ background: "#7b0000" }} /><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#c41c04" }} />largely unrecorded</span>
+            <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#e8731a" }} />value under-declared</span>
+            <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#d08068" }} />within normal</span>
+            <span><i className="inline-block w-2.5 h-2.5 align-middle mr-1.5" style={{ background: "#eaccbf" }} />Lebanon declares more</span>
           </div>
           {measure === "fiscal" && (
             <div className="text-[11.5px] text-slate2 mt-2">Normal and over-declared bands carry no fiscal loss by definition; switch to Corridors to see their size.</div>

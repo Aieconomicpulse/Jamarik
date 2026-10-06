@@ -3,7 +3,7 @@ import { COOKIE_NAME, verifySession } from "@/lib/auth";
 import { loadGaps } from "@/lib/data";
 import { sliceFor, detectiveContext } from "@/lib/slice";
 
-// The Trade Detective — a Claude-powered forensic investigator for Jamarik.
+// The Customs Detective — a Claude-powered forensic investigator for Jamarik.
 // The client posts { messages, year }. The grounding — a compact slice of
 // data/mirror_gaps.json for that year — is built HERE, from the server's own
 // copy of the data, never from anything the client sends: a client-supplied
@@ -34,7 +34,7 @@ export const dynamic = "force-dynamic";
 
 const MODEL = process.env.DETECTIVE_MODEL || "claude-sonnet-4-5";
 
-const SYSTEM = `You are the **Trade Detective** — a forensic trade-integrity analyst for Lebanon's Customs Administration.
+const SYSTEM = `You are the **Customs Detective** — a forensic trade-integrity analyst for Lebanon's Customs Administration.
 
 You investigate "mirror" discrepancies: what Lebanon's trading partners report EXPORTING to Lebanon versus what Lebanon reports IMPORTING, per partner × HS-4 corridor. Partner figures are FOB and are scaled to CIF before comparison. Persistent, one-sided gaps are where customs and VAT revenue leaks.
 

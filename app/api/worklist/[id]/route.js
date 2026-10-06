@@ -24,9 +24,14 @@ export async function PATCH(req, { params }) {
   if (amount != null && (!Number.isFinite(amount) || amount < 0)) return Response.json({ error: "recovered_usd must be a non-negative number" }, { status: 400 });
   const note = typeof body?.note === "string" ? body.note.slice(0, 2000) : null;
 
-  const item = await upsertItem({
-    id, year: m[1], partner: m[2], hs4: m[3], hs6: body?.hs6 ?? null,
-    status, recovered_usd: amount, note, updated_by: session.u,
-  });
-  return Response.json({ item }, { headers: { "Cache-Control": "no-store" } });
+  try {
+    const item = await upsertItem({
+      id, year: m[1], partner: m[2], hs4: m[3], hs6: body?.hs6 ?? null,
+      status, recovered_usd: amount, note, updated_by: session.u,
+    });
+    return Response.json({ item }, { headers: { "Cache-Control": "no-store" } });
+  } catch (err) {
+    console.error("PATCH /api/worklist/[id]:", err);
+    return Response.json({ error: err.message || "The change could not be saved." }, { status: 500 });
+  }
 }

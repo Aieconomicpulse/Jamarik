@@ -1,0 +1,41 @@
+{
+  "_comment": "Countries the Live data tab lists, and how each one is reached. A country with no `connector` is still checked for files in data/live/<code>/ — drop a CSV, Excel, JSON, text or HTML file there and it counts as connected. An `http` connector is fetched on demand; put secrets in environment variables and name them here (url_env, headers_env), never the values. Codes are UN M49 / Comtrade codes, so they line up with the mirror partners.",
+  "countries": [
+    { "code": 156, "name": "China" },
+    { "code": 300, "name": "Greece" },
+    { "code": 380, "name": "Italy" },
+    { "code": 792, "name": "Türkiye" },
+    { "code": 784, "name": "United Arab Emirates" },
+    { "code": 842, "name": "United States" },
+    { "code": 276, "name": "Germany" },
+    { "code": 251, "name": "France" },
+    { "code": 724, "name": "Spain" },
+    { "code": 528, "name": "Netherlands" },
+    { "code": 56, "name": "Belgium" },
+    { "code": 826, "name": "United Kingdom" },
+    { "code": 757, "name": "Switzerland" },
+    { "code": 699, "name": "India" },
+    { "code": 818, "name": "Egypt" },
+    { "code": 682, "name": "Saudi Arabia" },
+    { "code": 400, "name": "Jordan" },
+    { "code": 196, "name": "Cyprus" },
+    { "code": 643, "name": "Russian Federation" },
+    { "code": 76, "name": "Brazil" },
+    { "code": 586, "name": "Pakistan" }
+  ],
+  "_examples_comment": "Shown only in the Live data tab's Example mode, read from samples/live/<code>/. Example data, never real.",
+  "examples": [
+    { "code": 586, "name": "Pakistan" }
+  ],
+  "_example_http_connector": {
+    "code": 300,
+    "name": "Greece",
+    "connector": {
+      "type": "http",
+      "label": "Hellenic customs export feed",
+      "url_env": "LIVE_URL_300",
+      "headers_env": "LIVE_HEADERS_300",
+      "format": "auto"
+    }
+  }
+}

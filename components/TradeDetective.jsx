@@ -8,27 +8,104 @@ const STARTERS = [
   "Which of these gaps look genuinely suspicious, and which have an innocent explanation?",
   "Which headings gap in both years, and why does that matter?",
   "What is the total VAT at risk — and how solid is that number?",
+  "What is the total customs revenue at risk for pharmaceuticals (HS 30) — and are there any duties exemptions applied in Lebanon?",
 ];
 
-/** Minimal markdown: **bold** and line breaks. Nothing else is trusted through. */
+/** Inline markdown: **bold**, *italic*, `code`. Rendered as React nodes, never as HTML. */
+function Inline({ text }) {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`|(?<![*\w])\*[^*\s][^*]*\*(?!\w))/g).map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4)
+      return <strong key={i} className="text-ink font-semibold">{part.slice(2, -2)}</strong>;
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 2)
+      return <code key={i} className="num text-[12.5px] bg-bone2 px-1 rounded">{part.slice(1, -1)}</code>;
+    if (part.startsWith("*") && part.endsWith("*") && part.length > 2)
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    return <span key={i}>{part}</span>;
+  });
+}
+
+const HEADING = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
+const RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
+const BULLET = /^(\s*)[-*+•]\s+(.*)$/;
+const NUMBERED = /^(\s*)(\d+)[.)]\s+(.*)$/;
+const QUOTE = /^\s*>\s?(.*)$/;
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const TABLE_SEP = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+const cells = (row) => row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+
+/** Small markdown subset: headings, rules, bullets, numbered lists, quotes, tables, inline emphasis. */
 function MessageText({ text }) {
-  return (
-    <>
-      {text.split("\n").map((line, i) => (
-        <span key={i} className="block">
-          {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
-            part.startsWith("**") && part.endsWith("**") ? (
-              <strong key={j} className="text-ink font-semibold">
-                {part.slice(2, -2)}
-              </strong>
-            ) : (
-              <span key={j}>{part}</span>
-            )
-          )}
-        </span>
-      ))}
-    </>
-  );
+  const lines = text.split("\n");
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let m;
+    if (!line.trim()) continue;
+    if (RULE.test(line)) {
+      out.push(<hr key={i} className="border-rule my-3" />);
+    } else if ((m = line.match(HEADING))) {
+      const level = m[1].length;
+      out.push(
+        <div key={i} className={
+          level <= 2
+            ? "text-[19px] font-semibold text-ink leading-snug mt-4 mb-1"
+            : level === 3
+            ? "text-[16.5px] font-semibold text-ink leading-snug mt-3 mb-0.5"
+            : "text-[15px] font-semibold text-ink mt-3 mb-0.5"
+        }>
+          <Inline text={m[2]} />
+        </div>
+      );
+    } else if (TABLE_ROW.test(line) && i + 1 < lines.length && TABLE_SEP.test(lines[i + 1])) {
+      const head = cells(line);
+      const rows = [];
+      let j = i + 2;
+      while (j < lines.length && TABLE_ROW.test(lines[j])) rows.push(cells(lines[j++]));
+      out.push(
+        <div key={i} className="overflow-x-auto my-2">
+          <table className="text-[12.5px] border-collapse">
+            <thead>
+              <tr>{head.map((h, k) => (
+                <th key={k} className="text-left font-semibold text-ink border-b border-rule px-2.5 py-1.5"><Inline text={h} /></th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {rows.map((r, k) => (
+                <tr key={k}>{r.map((c, n) => (
+                  <td key={n} className="border-b border-rule/60 px-2.5 py-1.5 align-top"><Inline text={c} /></td>
+                ))}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      i = j - 1;
+    } else if ((m = line.match(BULLET))) {
+      const depth = Math.min(Math.floor(m[1].length / 2), 3);
+      out.push(
+        <div key={i} className="flex gap-2" style={{ paddingLeft: depth * 18 }}>
+          <span aria-hidden className="text-slate2 select-none">•</span>
+          <span className="flex-1"><Inline text={m[2]} /></span>
+        </div>
+      );
+    } else if ((m = line.match(NUMBERED))) {
+      const depth = Math.min(Math.floor(m[1].length / 2), 3);
+      out.push(
+        <div key={i} className="flex gap-2" style={{ paddingLeft: depth * 18 }}>
+          <span aria-hidden className="num text-slate2 select-none min-w-[1.25rem]">{m[2]}.</span>
+          <span className="flex-1"><Inline text={m[3]} /></span>
+        </div>
+      );
+    } else if ((m = line.match(QUOTE))) {
+      out.push(
+        <div key={i} className="border-l-2 border-rule pl-3 text-slate1"><Inline text={m[1]} /></div>
+      );
+    } else {
+      out.push(<div key={i}><Inline text={line} /></div>);
+    }
+  }
+  return <>{out}</>;
 }
 
 export default function TradeDetective({ data, year, yearControl }) {
@@ -92,7 +169,7 @@ export default function TradeDetective({ data, year, yearControl }) {
     <div className="grid lg:grid-cols-[1fr_320px] gap-6">
       <Panel className="flex flex-col min-h-[520px]">
         <PanelHead
-          title="Trade Detective"
+          title="Customs Detective"
           sub="Ask about the flagged corridors, signatures and revenue at risk · powered by Claude"
           right={yearControl}
         />
@@ -153,7 +230,7 @@ export default function TradeDetective({ data, year, yearControl }) {
                 send(draft);
               }
             }}
-            placeholder="Ask the Trade Detective…"
+            placeholder="Ask the Customs Detective…"
             className="flex-1 resize-none min-h-[40px] rounded-md bg-bone border border-rule text-ink text-[13.5px] px-3 py-2.5 leading-relaxed transition-colors hover:border-slate2 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/25 placeholder:text-slate2"
           />
           <Button icon="send" onClick={() => send(draft)} disabled={busy || !draft.trim()} className="shrink-0">

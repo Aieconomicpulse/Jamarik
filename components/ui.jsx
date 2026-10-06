@@ -24,6 +24,8 @@ const ICONS = {
   send: "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z",
   info: "M12 16v-4M12 8h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z",
   scale: "M16 5v22M6 10h20M6 10 2 20a4.5 4.5 0 0 0 8 0ZM26 10l4 10a4.5 4.5 0 0 1-8 0ZM11 27h10",
+  globe: "M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0zM12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20",
+  upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
   tasks: "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
 };
 
@@ -46,10 +48,12 @@ export function Eyebrow({ children, className = "" }) {
 const TEXT_TONE = {
   ink: "text-ink", ink2: "text-ink2", gold: "text-gold", burgundy: "text-burgundy",
   cedar: "text-cedar", sea: "text-sea", slate: "text-slate1",
+  crimson: "text-crimson", amber: "text-amber",
 };
 const EDGE_TONE = {
   ink: "border-l-ink/25", gold: "border-l-gold", burgundy: "border-l-burgundy",
   cedar: "border-l-cedar", sea: "border-l-sea", slate: "border-l-slate2",
+  crimson: "border-l-crimson", amber: "border-l-amber",
 };
 
 /** Headline figure in a card. The left edge carries the tone. */
@@ -103,6 +107,8 @@ export function Chip({ children, tone = "neutral" }) {
     burgundy: "bg-burgundy/10 text-burgundy border-burgundy/30",
     gold: "bg-gold/10 text-gold border-gold/30",
     sea: "bg-sea/10 text-sea border-sea/30",
+    crimson: "bg-crimson/10 text-crimson border-crimson/30",
+    amber: "bg-amber/10 text-amber border-amber/30",
   };
   return (
     <span className={`inline-flex items-center whitespace-nowrap rounded-full text-[10.5px] tracking-wider uppercase px-2.5 py-[3px] border num ${tones[tone] || tones.neutral}`}>
@@ -193,6 +199,24 @@ export function Skeleton({ className = "" }) {
   return <div className={`skeleton ${className}`} aria-hidden="true" />;
 }
 
+/**
+ * A row of small stats that scrolls itself sideways rather than wrapping —
+ * for a strip with more items than fit on one line. Pauses on hover so it
+ * can still be read, and is held still under prefers-reduced-motion by the
+ * global rule in globals.css. The children are laid out twice, back to
+ * back, so the loop has no visible seam.
+ */
+export function Ticker({ children, className = "" }) {
+  return (
+    <div className={`ticker overflow-hidden border-y border-rule bg-bone2/50 ${className}`}>
+      <div className="ticker-track flex w-max items-center">
+        <div className="flex shrink-0 items-center gap-x-6 pl-1 pr-6 py-2 text-[11.5px] text-slate1">{children}</div>
+        <div aria-hidden="true" className="flex shrink-0 items-center gap-x-6 pl-1 pr-6 py-2 text-[11.5px] text-slate1">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Triage primitives ────────────────────────────────────────────────────────
    The queue leads with one number that matters and keeps everything else
    subordinate to it, so the screen reads as a decision rather than a report. */
@@ -230,7 +254,7 @@ export function Metric({ label, value, sub, tone = "ink", size = "md" }) {
 
 /** Proportion bar. Width carries the value; colour only carries category. */
 export function Bar({ value, tone = "gold", className = "" }) {
-  const c = { gold: "bg-gold", burgundy: "bg-burgundy", cedar: "bg-cedar", sea: "bg-sea", slate: "bg-slate2" }[tone] || "bg-gold";
+  const c = { gold: "bg-gold", burgundy: "bg-burgundy", cedar: "bg-cedar", sea: "bg-sea", slate: "bg-slate2", crimson: "bg-crimson", amber: "bg-amber" }[tone] || "bg-gold";
   return (
     <div className={`h-[4px] rounded-full bg-rule w-full overflow-hidden ${className}`}>
       <div className={`h-full rounded-full ${c} transition-[width] duration-300`}

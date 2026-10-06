@@ -21,27 +21,37 @@ export async function GET(req) {
   const limit = Math.min(2000, Number(url.searchParams.get("limit")) || (hasPartner ? 2000 : 60));
   if (!year) return Response.json({ error: "year is required" }, { status: 400 });
 
-  const gaps = await loadGaps();
-  let corridors = sliceFor(gaps, year).corridors;
-  if (hasPartner) corridors = corridors.filter((c) => c.partner === Number(partner));
-  const t = triage(corridors);
-  const ranked = [...t.recoverable, ...t.checkOrigin].sort((a, b) => b.expected - a.expected).slice(0, limit);
-  const status = await statusesFor(year);
+  // Every call below can throw (a bad build file, a database that failed to
+  // open). Left unguarded, Next.js turns that into a bare 500 with no JSON
+  // body, and the client's `r.json()` fails with "Unexpected end of JSON
+  // input" instead of showing the actual problem — see lib/db.js and
+  // lib/http.js for the other half of this fix.
+  try {
+    const gaps = await loadGaps();
+    let corridors = sliceFor(gaps, year).corridors;
+    if (hasPartner) corridors = corridors.filter((c) => c.partner === Number(partner));
+    const t = triage(corridors);
+    const ranked = [...t.recoverable, ...t.checkOrigin].sort((a, b) => b.expected - a.expected).slice(0, limit);
+    const status = await statusesFor(year);
 
-  const items = ranked.map((c, i) => {
-    const id = itemId(c.year, c.partner, c.hs4);
-    const row = status[id];
-    return {
-      id, rank: i + 1,
-      year: c.year, partner: c.partner, partnerName: c.partnerName, hs4: c.hs4, chapter: c.chapter, label: c.label,
-      x_fob: c.x_fob, x_cif: c.x_cif, m: c.m, cover: c.cover, gap: c.gap, partner_kg: c.partner_kg,
-      unit_value: c.partner_kg ? c.x_fob / c.partner_kg : null,
-      signature: c.signature, p_real: c.p_real ?? null, fiscal_loss: c.fiscal_loss,
-      estimated: c.fiscal_loss * (c.p_real ?? 0), expected: c.expected,
-      rung: c.rung.level, tests: c.rung.tests, evidence: c.evidence, preference: c.preference, persistent: c.persistent, absent: c.absent,
-      status: row?.status ?? "new", recovered_usd: row?.recovered_usd ?? null, note: row?.note ?? null,
-      updated_by: row?.updated_by ?? null, updated_at: row?.updated_at ?? null,
-    };
-  });
-  return Response.json({ year, items, signatures: gaps.meta.signatures }, { headers: { "Cache-Control": "no-store" } });
+    const items = ranked.map((c, i) => {
+      const id = itemId(c.year, c.partner, c.hs4);
+      const row = status[id];
+      return {
+        id, rank: i + 1,
+        year: c.year, partner: c.partner, partnerName: c.partnerName, hs4: c.hs4, chapter: c.chapter, label: c.label,
+        x_fob: c.x_fob, x_cif: c.x_cif, m: c.m, cover: c.cover, gap: c.gap, partner_kg: c.partner_kg,
+        unit_value: c.partner_kg ? c.x_fob / c.partner_kg : null,
+        signature: c.signature, p_real: c.p_real ?? null, fiscal_loss: c.fiscal_loss,
+        estimated: c.fiscal_loss * (c.p_real ?? 0), expected: c.expected,
+        rung: c.rung.level, tests: c.rung.tests, evidence: c.evidence, preference: c.preference, persistent: c.persistent, absent: c.absent,
+        status: row?.status ?? "new", recovered_usd: row?.recovered_usd ?? null, note: row?.note ?? null,
+        updated_by: row?.updated_by ?? null, updated_at: row?.updated_at ?? null,
+      };
+    });
+    return Response.json({ year, items, signatures: gaps.meta.signatures }, { headers: { "Cache-Control": "no-store" } });
+  } catch (err) {
+    console.error("GET /api/worklist:", err);
+    return Response.json({ error: err.message || "The worklist could not be loaded." }, { status: 500 });
+  }
 }
