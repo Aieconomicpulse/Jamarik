@@ -19,8 +19,8 @@ import { Icon, Segmented, Skeleton } from "@/components/ui";
 // The Detective stays available behind a flag: NEXT_PUBLIC_DETECTIVE=off hides it.
 const DETECTIVE = process.env.NEXT_PUBLIC_DETECTIVE !== "off";
 const TABS = [
-  ["products", "Products", "package", "Every product, partner by partner"],
   ["analytics", "Corridors", "chart", "Shape of the shortfall by band"],
+  ["products", "Products", "package", "Every product, partner by partner"],
   // Evidence and Method are switched off for now (lib/features.js, REWIRE.md).
   ...(FEATURES.evidenceTab ? [["ledger", "Evidence", "table", "Every corridor, unranked and complete"]] : []),
   ...(DETECTIVE ? [["detective", "Detective", "search", "Ask about the flagged corridors"]] : []),
