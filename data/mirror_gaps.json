@@ -593,7 +593,7 @@
     ]
    },
    "bootstrap_draws": 400,
-   "computed": "2026-09-09",
+   "computed": "2026-10-06",
    "years": {
     "2023": {
      "gross": 212700680.71,
@@ -619,7 +619,20 @@
          "n_mirror": 43,
          "p_noise": 0.374
         }
-       }
+       },
+       "raw": 159642922.11,
+       "set_aside": 0,
+       "normal": 3436908.95,
+       "flagged_gross": 156206013.15,
+       "chapter_netting": 27762427.07,
+       "after_chapter": 128443586.08,
+       "tariff_shift_duty": 0,
+       "attributable": 128443586.08,
+       "short_flagged": 808592830.2,
+       "short_offset": 177391813.7,
+       "short_after": 631201016.5,
+       "same_rate_offset": 177391813.7,
+       "tariff_shift_count": 0
       },
       "300": {
        "name": "Greece",
@@ -637,7 +650,20 @@
          "n_mirror": 8,
          "p_noise": 0.5
         }
-       }
+       },
+       "raw": 3744421.23,
+       "set_aside": 0,
+       "normal": 71193.8,
+       "flagged_gross": 3673227.4,
+       "chapter_netting": 1428598.24,
+       "after_chapter": 2244629.16,
+       "tariff_shift_duty": 0,
+       "attributable": 2244629.16,
+       "short_flagged": 27758985.06,
+       "short_offset": 12987256.95,
+       "short_after": 14771728.11,
+       "same_rate_offset": 12987256.95,
+       "tariff_shift_count": 0
       },
       "380": {
        "name": "Italy",
@@ -655,7 +681,20 @@
          "n_mirror": 19,
          "p_noise": 0.339
         }
-       }
+       },
+       "raw": 22373970.06,
+       "set_aside": 14669.13,
+       "normal": 7825048.62,
+       "flagged_gross": 14534252.3,
+       "chapter_netting": 1718301.49,
+       "after_chapter": 12815950.81,
+       "tariff_shift_duty": 0,
+       "attributable": 12815950.81,
+       "short_flagged": 125102053.77,
+       "short_offset": 14643399.86,
+       "short_after": 110458653.91,
+       "same_rate_offset": 14643399.86,
+       "tariff_shift_count": 0
       },
       "784": {
        "name": "UAE",
@@ -673,7 +712,20 @@
          "n_mirror": 11,
          "p_noise": 0.688
         }
-       }
+       },
+       "raw": 20524488.13,
+       "set_aside": 0.0,
+       "normal": 2511696.16,
+       "flagged_gross": 18012791.98,
+       "chapter_netting": 2149662.46,
+       "after_chapter": 15863129.52,
+       "tariff_shift_duty": 0,
+       "attributable": 15863129.52,
+       "short_flagged": 127661379.98,
+       "short_offset": 6690852.42,
+       "short_after": 120970527.56,
+       "same_rate_offset": 6690852.42,
+       "tariff_shift_count": 0
       },
       "842": {
        "name": "United States",
@@ -691,9 +743,35 @@
          "n_mirror": 48,
          "p_noise": 1.0
         }
-       }
+       },
+       "raw": 25136935.64,
+       "set_aside": 4308672.27,
+       "normal": 553867.52,
+       "flagged_gross": 20274395.88,
+       "chapter_netting": 6353034.76,
+       "after_chapter": 13921361.12,
+       "tariff_shift_duty": 0,
+       "attributable": 13921361.12,
+       "short_flagged": 101892309.25,
+       "short_offset": 37555033.4,
+       "short_after": 64337275.85,
+       "same_rate_offset": 37555033.4,
+       "tariff_shift_count": 0
       }
-     }
+     },
+     "raw": 231422737.17,
+     "set_aside": 4323341.4,
+     "normal": 14398715.05,
+     "flagged_gross": 212700680.71,
+     "chapter_netting": 39412024.02,
+     "after_chapter": 173288656.69,
+     "tariff_shift_duty": 0.0,
+     "attributable": 173288656.69,
+     "short_flagged": 1191007558.26,
+     "short_offset": 249268356.33,
+     "short_after": 941739201.93,
+     "same_rate_offset": 249268356.33,
+     "tariff_shift_count": 0
     },
     "2024": {
      "gross": 154757985.12,
@@ -719,7 +797,20 @@
          "n_mirror": 49,
          "p_noise": 0.458
         }
-       }
+       },
+       "raw": 116768566.14,
+       "set_aside": 0,
+       "normal": 4101131.66,
+       "flagged_gross": 112667434.5,
+       "chapter_netting": 27062874.15,
+       "after_chapter": 85604560.35,
+       "tariff_shift_duty": 0,
+       "attributable": 85604560.35,
+       "short_flagged": 631981353.15,
+       "short_offset": 190746566.05,
+       "short_after": 441234787.1,
+       "same_rate_offset": 190746566.05,
+       "tariff_shift_count": 0
       },
       "300": {
        "name": "Greece",
@@ -737,7 +828,20 @@
          "n_mirror": 12,
          "p_noise": 1.0
         }
-       }
+       },
+       "raw": 3981729.71,
+       "set_aside": 0,
+       "normal": 153043.9,
+       "flagged_gross": 3828685.81,
+       "chapter_netting": 2242314.21,
+       "after_chapter": 1586371.6,
+       "tariff_shift_duty": 0,
+       "attributable": 1586371.6,
+       "short_flagged": 28838313.82,
+       "short_offset": 14979536.89,
+       "short_after": 13858776.93,
+       "same_rate_offset": 14979536.89,
+       "tariff_shift_count": 0
       },
       "380": {
        "name": "Italy",
@@ -755,7 +859,20 @@
          "n_mirror": 17,
          "p_noise": 0.327
         }
-       }
+       },
+       "raw": 16111275.57,
+       "set_aside": 81703.96,
+       "normal": 1721894.22,
+       "flagged_gross": 14307677.4,
+       "chapter_netting": 1699723.77,
+       "after_chapter": 12607953.63,
+       "tariff_shift_duty": 0,
+       "attributable": 12607953.63,
+       "short_flagged": 119058012.67,
+       "short_offset": 14862861.05,
+       "short_after": 104195151.62,
+       "same_rate_offset": 14862861.05,
+       "tariff_shift_count": 0
       },
       "682": {
        "name": "Saudi Arabia",
@@ -773,7 +890,20 @@
          "n_mirror": 10,
          "p_noise": 0.714
         }
-       }
+       },
+       "raw": 4739389.45,
+       "set_aside": 0.0,
+       "normal": 175868.15,
+       "flagged_gross": 4563521.31,
+       "chapter_netting": 452704.52,
+       "after_chapter": 4110816.79,
+       "tariff_shift_duty": 0,
+       "attributable": 4110816.79,
+       "short_flagged": 41486557.29,
+       "short_offset": 4115495.59,
+       "short_after": 37371061.7,
+       "same_rate_offset": 4115495.59,
+       "tariff_shift_count": 0
       },
       "842": {
        "name": "United States",
@@ -791,14 +921,269 @@
          "n_mirror": 48,
          "p_noise": 1.0
         }
-       }
+       },
+       "raw": 26980087.1,
+       "set_aside": 6022883.11,
+       "normal": 1566537.91,
+       "flagged_gross": 19390666.1,
+       "chapter_netting": 5728799.02,
+       "after_chapter": 13661867.08,
+       "tariff_shift_duty": 0,
+       "attributable": 13661867.08,
+       "short_flagged": 108824886.55,
+       "short_offset": 35268369.95,
+       "short_after": 73556516.6,
+       "same_rate_offset": 35268369.95,
+       "tariff_shift_count": 0
       }
-     }
+     },
+     "raw": 168581047.97,
+     "set_aside": 6104587.07,
+     "normal": 7718475.84,
+     "flagged_gross": 154757985.12,
+     "chapter_netting": 37186415.67,
+     "after_chapter": 117571569.45,
+     "tariff_shift_duty": 0.0,
+     "attributable": 117571569.45,
+     "short_flagged": 930189123.48,
+     "short_offset": 259972829.53,
+     "short_after": 670216293.95,
+     "same_rate_offset": 259972829.53,
+     "tariff_shift_count": 0
     }
    }
   },
   "corridor_rule": "A heading is a corridor when either side reaches $250,000 (CIF); Lebanon-only headings read not_in_partner and carry no shortfall.",
-  "postprocessed": "2026-09-09"
+  "postprocessed": "2026-10-06",
+  "decomposition": {
+   "method": "waterfall",
+   "note": "Every positive HS-4 gap, in VAT-and-duty terms, is taken apart step by step: exempt and one-sided headings are set aside; corridors within ordinary asymmetry (85-160% cover) are left out; what remains is the flagged gross. Within each HS-2 chapter the flagged shortfall is then offset by what Lebanon books above the partner on the chapter's headings that read 'Lebanon declares more' or that the partner never reports (reclassification; surpluses inside ordinary asymmetry are left to the reflected tail, so noise is not counted twice), and the duty difference on pairs that moved to a cheaper heading is added back. What is left is customs-attributable by the current method - before partner reporting bias, transit and timing, which need Customs' own data and are listed as pending. Duty rates are chapter bands until the HS-6 tariff table is loaded, so every pair inside a chapter carries the same rate today and duty_at_stake is zero; the pairs are still the classification audit list. The reflected-tail figure in meta.estimate is a second, independent reading of the same flagged gross.",
+   "pending": [
+    {
+     "key": "partner_bias",
+     "label": "Partner reporting bias",
+     "why": "China's export-VAT rebate rewards a higher declared export value, so part of the gap is the partner's reporting, not Lebanon's. A gap Lebanon shares with Germany or Japan on the same heading is not a Lebanese loss.",
+     "needs": "Cover ratios for the same partner headings into control importers with strong customs (Germany, Netherlands, Japan, Korea, Australia, Canada): six more Comtrade reporter pulls per partner."
+    },
+    {
+     "key": "transit",
+     "label": "Transit to Syria and beyond",
+     "why": "China books Syria-bound cargo landed at Beirut or Tripoli as an export to Lebanon; Lebanon records a transit, not an import. It shows as goods missing, never as low prices \u2014 the same shape as smuggling.",
+     "needs": "Lebanese Customs transit and re-export statistics by chapter; Port of Beirut and Tripoli monthly container series; China's exports to Syria as the dynamic test as direct routes reopen."
+    },
+    {
+     "key": "quantity",
+     "label": "Under-valuation versus missing goods",
+     "why": "A declaration at 40% of value with the weight intact is under-pricing; the same 40% with the weight missing is goods that never cleared. Comtrade carries no genuine Lebanese weights, so the two cannot be told apart here.",
+     "needs": "Lebanese Customs' own statistics with value and net weight by HS-8 and origin, or NAJM declaration extracts."
+    },
+    {
+     "key": "timing",
+     "label": "Timing and the customs dollar",
+     "why": "A December shipment clears in January and shows as a gap in both years. Before 2023 duty was assessed at 1,507.5 LBP to the dollar, so a dollar of gap then was worth a fraction of a dollar of gap now.",
+     "needs": "2019\u20132024 bulk files for three-year centred averages, and the customs exchange rate by year."
+    }
+   ],
+   "computed": "2026-10-06",
+   "years": {
+    "2023": {
+     "raw": 231422737.17,
+     "set_aside": 4323341.4,
+     "normal": 14398715.05,
+     "flagged_gross": 212700680.71,
+     "chapter_netting": 39412024.02,
+     "after_chapter": 173288656.69,
+     "tariff_shift_duty": 0.0,
+     "attributable": 173288656.69,
+     "short_flagged": 1191007558.26,
+     "short_offset": 249268356.33,
+     "short_after": 941739201.93,
+     "same_rate_offset": 249268356.33,
+     "tariff_shift_count": 0,
+     "partners": {
+      "156": {
+       "name": "China",
+       "raw": 159642922.11,
+       "set_aside": 0,
+       "normal": 3436908.95,
+       "flagged_gross": 156206013.15,
+       "chapter_netting": 27762427.07,
+       "after_chapter": 128443586.08,
+       "tariff_shift_duty": 0,
+       "attributable": 128443586.08,
+       "short_flagged": 808592830.2,
+       "short_offset": 177391813.7,
+       "short_after": 631201016.5,
+       "same_rate_offset": 177391813.7,
+       "tariff_shift_count": 0
+      },
+      "300": {
+       "name": "Greece",
+       "raw": 3744421.23,
+       "set_aside": 0,
+       "normal": 71193.8,
+       "flagged_gross": 3673227.4,
+       "chapter_netting": 1428598.24,
+       "after_chapter": 2244629.16,
+       "tariff_shift_duty": 0,
+       "attributable": 2244629.16,
+       "short_flagged": 27758985.06,
+       "short_offset": 12987256.95,
+       "short_after": 14771728.11,
+       "same_rate_offset": 12987256.95,
+       "tariff_shift_count": 0
+      },
+      "380": {
+       "name": "Italy",
+       "raw": 22373970.06,
+       "set_aside": 14669.13,
+       "normal": 7825048.62,
+       "flagged_gross": 14534252.3,
+       "chapter_netting": 1718301.49,
+       "after_chapter": 12815950.81,
+       "tariff_shift_duty": 0,
+       "attributable": 12815950.81,
+       "short_flagged": 125102053.77,
+       "short_offset": 14643399.86,
+       "short_after": 110458653.91,
+       "same_rate_offset": 14643399.86,
+       "tariff_shift_count": 0
+      },
+      "784": {
+       "name": "UAE",
+       "raw": 20524488.13,
+       "set_aside": 0.0,
+       "normal": 2511696.16,
+       "flagged_gross": 18012791.98,
+       "chapter_netting": 2149662.46,
+       "after_chapter": 15863129.52,
+       "tariff_shift_duty": 0,
+       "attributable": 15863129.52,
+       "short_flagged": 127661379.98,
+       "short_offset": 6690852.42,
+       "short_after": 120970527.56,
+       "same_rate_offset": 6690852.42,
+       "tariff_shift_count": 0
+      },
+      "842": {
+       "name": "United States",
+       "raw": 25136935.64,
+       "set_aside": 4308672.27,
+       "normal": 553867.52,
+       "flagged_gross": 20274395.88,
+       "chapter_netting": 6353034.76,
+       "after_chapter": 13921361.12,
+       "tariff_shift_duty": 0,
+       "attributable": 13921361.12,
+       "short_flagged": 101892309.25,
+       "short_offset": 37555033.4,
+       "short_after": 64337275.85,
+       "same_rate_offset": 37555033.4,
+       "tariff_shift_count": 0
+      }
+     },
+     "tariff_shift": []
+    },
+    "2024": {
+     "raw": 168581047.97,
+     "set_aside": 6104587.07,
+     "normal": 7718475.84,
+     "flagged_gross": 154757985.12,
+     "chapter_netting": 37186415.67,
+     "after_chapter": 117571569.45,
+     "tariff_shift_duty": 0.0,
+     "attributable": 117571569.45,
+     "short_flagged": 930189123.48,
+     "short_offset": 259972829.53,
+     "short_after": 670216293.95,
+     "same_rate_offset": 259972829.53,
+     "tariff_shift_count": 0,
+     "partners": {
+      "156": {
+       "name": "China",
+       "raw": 116768566.14,
+       "set_aside": 0,
+       "normal": 4101131.66,
+       "flagged_gross": 112667434.5,
+       "chapter_netting": 27062874.15,
+       "after_chapter": 85604560.35,
+       "tariff_shift_duty": 0,
+       "attributable": 85604560.35,
+       "short_flagged": 631981353.15,
+       "short_offset": 190746566.05,
+       "short_after": 441234787.1,
+       "same_rate_offset": 190746566.05,
+       "tariff_shift_count": 0
+      },
+      "300": {
+       "name": "Greece",
+       "raw": 3981729.71,
+       "set_aside": 0,
+       "normal": 153043.9,
+       "flagged_gross": 3828685.81,
+       "chapter_netting": 2242314.21,
+       "after_chapter": 1586371.6,
+       "tariff_shift_duty": 0,
+       "attributable": 1586371.6,
+       "short_flagged": 28838313.82,
+       "short_offset": 14979536.89,
+       "short_after": 13858776.93,
+       "same_rate_offset": 14979536.89,
+       "tariff_shift_count": 0
+      },
+      "380": {
+       "name": "Italy",
+       "raw": 16111275.57,
+       "set_aside": 81703.96,
+       "normal": 1721894.22,
+       "flagged_gross": 14307677.4,
+       "chapter_netting": 1699723.77,
+       "after_chapter": 12607953.63,
+       "tariff_shift_duty": 0,
+       "attributable": 12607953.63,
+       "short_flagged": 119058012.67,
+       "short_offset": 14862861.05,
+       "short_after": 104195151.62,
+       "same_rate_offset": 14862861.05,
+       "tariff_shift_count": 0
+      },
+      "682": {
+       "name": "Saudi Arabia",
+       "raw": 4739389.45,
+       "set_aside": 0.0,
+       "normal": 175868.15,
+       "flagged_gross": 4563521.31,
+       "chapter_netting": 452704.52,
+       "after_chapter": 4110816.79,
+       "tariff_shift_duty": 0,
+       "attributable": 4110816.79,
+       "short_flagged": 41486557.29,
+       "short_offset": 4115495.59,
+       "short_after": 37371061.7,
+       "same_rate_offset": 4115495.59,
+       "tariff_shift_count": 0
+      },
+      "842": {
+       "name": "United States",
+       "raw": 26980087.1,
+       "set_aside": 6022883.11,
+       "normal": 1566537.91,
+       "flagged_gross": 19390666.1,
+       "chapter_netting": 5728799.02,
+       "after_chapter": 13661867.08,
+       "tariff_shift_duty": 0,
+       "attributable": 13661867.08,
+       "short_flagged": 108824886.55,
+       "short_offset": 35268369.95,
+       "short_after": 73556516.6,
+       "same_rate_offset": 35268369.95,
+       "tariff_shift_count": 0
+      }
+     },
+     "tariff_shift": []
+    }
+   }
+  }
  },
  "years": {
   "2023": {

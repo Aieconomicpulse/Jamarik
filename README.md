@@ -105,6 +105,45 @@ through Node's built-in driver on-prem, Postgres behind `DATABASE_URL` in the
 cloud (driver not wired yet). The Detective tab stays available behind a flag:
 `NEXT_PUBLIC_DETECTIVE=off` hides it.
 
+## Why is there a difference? — the decomposition
+
+A customs economist's first objection is that the mirror gap is transit,
+partner over-reporting and reclassification, not evasion. `estimate.py`
+therefore takes the gap apart before a dollar is called lost and writes the
+result to `meta.decomposition` (per year and partner; the same figures sit
+beside the reflected-tail ones in `meta.estimate`, so one object carries both
+methods):
+
+1. **What the mirror shows before adjustment** — every positive HS-4 gap, in
+   VAT-and-duty terms, partner re-exports already off.
+2. − **Exempt regimes and one-sided headings** (set aside).
+3. − **Within ordinary asymmetry** (cover 85–160%).
+4. = **Flagged gross** — the figure the portal used to lead with.
+5. − **Reclassification within chapter**: chapter by chapter, the flagged
+   shortfall is offset by what Lebanon books above the partner on the headings
+   of the same HS-2 that read "Lebanon declares more" (cover 160% and above) or
+   that the partner never reports (`short_offset` of `short_flagged`).
+   Surpluses inside ordinary asymmetry are noise, and the reflected tail
+   already corrects for noise, so they are not netted — that would count it
+   twice. On the 2024 data this offsets 30% of China's flagged shortfall, 32%
+   of the United States' and 12% of Italy's.
+6. + **Duty lost to a lower-rate heading**: the heading pairs behind that
+   offset (`tariff_shift`, matched largest against largest) where goods moved
+   to a cheaper duty line. Duty rates are chapter bands until the HS-6 tariff
+   table is loaded, so this is zero today; the pairs are still the
+   classification audit list.
+7. = **Customs-attributable, current method** (`attributable`).
+
+Three things cannot be measured on public data and are listed in
+`meta.decomposition.pending` with what each needs: partner reporting bias
+(cover ratios into control importers with strong customs), transit to Syria
+and beyond (Lebanese transit statistics and the Syria-side mirror), and the
+under-valuation / missing-goods split (Lebanese weights); timing and the
+customs dollar wait for the 2019–2024 extension. The Corridors tab shows the
+waterfall and the pairs; the headline tiles lead with the attributable figure
+and keep the reflected tail and the unadjusted mirror beside it; the Detective
+is grounded in the same object.
+
 ## Live data
 
 The tab beside the worklist. It lists the countries in `config/live_sources.json`,

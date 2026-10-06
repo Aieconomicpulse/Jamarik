@@ -96,8 +96,11 @@ export async function GET(req) {
   // The headline is the HS-4 noise-corrected estimate, not a sum of lines.
   const gaps = await loadGaps();
   const yr = gaps.meta.estimate?.years?.[String(year)];
+  // Both methods ride on the partner object: the reflected tail and the waterfall.
+  const EST_KEYS = ["gross", "central", "floor", "raw", "set_aside", "normal", "flagged_gross", "chapter_netting",
+    "after_chapter", "tariff_shift_duty", "attributable", "short_flagged", "short_offset", "short_after"];
   const est = all
-    ? Object.values(yr?.partners || {}).reduce((a, p) => ({ gross: a.gross + p.gross, central: a.central + p.central, floor: a.floor + p.floor }), { gross: 0, central: 0, floor: 0 })
+    ? Object.values(yr?.partners || {}).reduce((a, p) => { for (const k of EST_KEYS) a[k] += p[k] || 0; return a; }, Object.fromEntries(EST_KEYS.map((k) => [k, 0])))
     : (yr?.partners?.[String(partner)] ?? null);
 
   return Response.json(

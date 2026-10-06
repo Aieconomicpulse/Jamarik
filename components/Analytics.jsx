@@ -5,7 +5,7 @@ import {
   Bar as RBar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { money, pct } from "@/lib/format";
-import { estimateFor, groupBy, summary } from "@/lib/losses";
+import { decompositionFor, estimateFor, groupBy, summary } from "@/lib/losses";
 import { Bar, Panel, PanelHead, Segmented, Tile } from "@/components/ui";
 
 const AXIS = "#7c7563";
@@ -55,6 +55,7 @@ export default function Analytics({ data, year, onOpenProducts, yearControl }) {
   const flaggedShare = s.corridors ? (s.under.count + s.unrecorded.count) / s.corridors : 0;
   // The headline is the noise-corrected estimate; gross sums are shown as bounds.
   const est = estimateFor(meta, year);
+  const dec = decompositionFor(meta, year);
   const val = (r) => (est ? r.corrected : r.fiscal);
   const maxCh = Math.max(...chapters.map(val), 1);
   const maxP = Math.max(...partners.map(val), 1);
@@ -71,7 +72,11 @@ export default function Analytics({ data, year, onOpenProducts, yearControl }) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 mb-8">
         {est ? (
           <>
-            <Tile label="Revenue at stake (estimate)" value={money(est.central)} tone="gold" sub={`range ${money(est.lo)}–${money(est.hi)} · gross ${money(s.fiscal)}`} />
+            {dec ? (
+              <Tile label="Customs-attributable (current method)" value={money(dec.attributable)} tone="gold" sub={`reflected tail ${money(est.central)} [${money(est.lo)}–${money(est.hi)}] · before adjustment ${money(dec.raw)}`} />
+            ) : (
+              <Tile label="Revenue at stake (estimate)" value={money(est.central)} tone="gold" sub={`range ${money(est.lo)}–${money(est.hi)} · gross ${money(s.fiscal)}`} />
+            )}
             <Tile label="of which VAT" value={money(s.fiscal ? s.vat * est.central / s.fiscal : 0)} sub="scaled to the estimate" />
             <Tile label="of which duty (indicative)" value={money(s.fiscal ? s.duty * est.central / s.fiscal : 0)} sub="scaled to the estimate" />
             <Tile label="Corridors flagged" value={`${s.under.count + s.unrecorded.count} · ${pct(flaggedShare * 100, 0)}`} />
@@ -89,6 +94,8 @@ export default function Analytics({ data, year, onOpenProducts, yearControl }) {
           </>
         )}
       </div>
+
+      {dec && est && <Waterfall dec={dec} est={est} onOpenProducts={onOpenProducts} />}
 
       {/* Shape of the problem */}
       <Panel className="mb-8">
@@ -176,5 +183,105 @@ export default function Analytics({ data, year, onOpenProducts, yearControl }) {
       </div>
 
     </div>
+  );
+}
+
+const STEP_TONE = { total: "gold", subtotal: "amber", minus: "slate", plus: "cedar" };
+
+/**
+ * The gap taken apart: each adjustment is one line, and the revenue claim sits
+ * only on what is left. The three things public data cannot settle are named,
+ * with what each needs, rather than silently left in.
+ */
+function Waterfall({ dec, est, onOpenProducts }) {
+  const scale = Math.max(dec.raw, 1);
+  const share = dec.short_flagged ? Math.round(100 * dec.short_offset / dec.short_flagged) : 0;
+  const rows = [
+    { k: "raw", kind: "total", label: "What the mirror shows before adjustment", value: dec.raw,
+      sub: "Partner exports ×1.05 against Lebanon's imports, HS-4 corridors over $250k, in VAT-and-duty terms; partner re-exports are already off" },
+    { k: "aside", kind: "minus", label: "Exempt regimes and one-sided headings", value: -dec.set_aside,
+      sub: "Military and aircraft enter under exemption; Saudi fuel and UAE diamonds are one-sided reporting — set aside" },
+    { k: "normal", kind: "minus", label: "Within ordinary asymmetry", value: -dec.normal,
+      sub: "Corridors Lebanon records at 85–160% of the partner figure: freight, timing, valuation" },
+    { k: "flagged", kind: "subtotal", label: "Flagged gross", value: dec.flagged_gross,
+      sub: "Under-declared and largely unrecorded corridors — the figure the portal used to lead with" },
+    { k: "chapter", kind: "minus", label: "Reclassification within chapter", value: -dec.chapter_netting,
+      sub: `${money(dec.short_offset)} of the ${money(dec.short_flagged)} shortfall (${share}%) is matched by what Lebanon books above the partner on headings of the same chapter that read "Lebanon declares more" — surpluses inside ordinary asymmetry are left to the reflected tail` },
+    { k: "tariff", kind: "plus", label: "Duty lost to a lower-rate heading", value: dec.tariff_shift_duty,
+      sub: dec.tariff_shift_count
+        ? `${dec.tariff_shift_count} heading pairs where goods moved to a cheaper duty line — the list below`
+        : "Duty rates are chapter bands until the HS-6 tariff table is loaded, so no pair shows a rate difference yet; the pairs behind the netting are still the classification audit list" },
+    { k: "attributable", kind: "total", label: "Customs-attributable, current method", value: dec.attributable,
+      sub: "Before partner reporting bias, transit and timing — the components below need Customs' own data" },
+  ];
+  const shifts = dec.tariff_shift.slice(0, 8);
+  return (
+    <Panel className="mb-8">
+      <PanelHead title="Why is there a difference?" sub="What the mirror gap is not, before a dollar is called lost · each line is one adjustment; the revenue claim sits only on what is left" />
+      <div className="px-5 py-4 grid lg:grid-cols-[minmax(0,1fr)_380px] gap-x-10 gap-y-6">
+        <ol className="space-y-3">
+          {rows.map((r) => {
+            const total = r.kind === "total" || r.kind === "subtotal";
+            return (
+              <li key={r.k} className={total ? "pt-2 border-t border-rule first:border-0 first:pt-0" : ""}>
+                <div className="flex items-baseline justify-between gap-4">
+                  <div className={`text-[13.5px] ${total ? "text-ink" : "text-ink2"}`}>
+                    {r.kind === "minus" && <span className="num text-slate2 mr-1.5">−</span>}
+                    {r.kind === "plus" && <span className="num text-slate2 mr-1.5">+</span>}
+                    {r.kind === "subtotal" && <span className="num text-slate2 mr-1.5">=</span>}
+                    {r.kind === "total" && r.k !== "raw" && <span className="num text-slate2 mr-1.5">=</span>}
+                    {r.label}
+                  </div>
+                  <div className={`num text-[15px] whitespace-nowrap ${r.kind === "total" ? "text-gold" : r.kind === "subtotal" ? "text-ink" : "text-slate1"}`}>{money(Math.abs(r.value))}</div>
+                </div>
+                <Bar value={Math.abs(r.value) / scale} tone={STEP_TONE[r.kind]} className="mt-1.5" />
+                <div className="text-[11.5px] text-slate1 leading-snug mt-1">{r.sub}</div>
+              </li>
+            );
+          })}
+          <li className="pt-3 border-t border-rule text-[12px] text-slate1 leading-relaxed">
+            <span className="text-ink">Second method.</span> The reflected tail reads <span className="num text-ink">{money(est.central)}</span> [{money(est.lo)}–{money(est.hi)}]: the symmetric-noise correction on the same flagged gross, an independent reading rather than a further step. Both are shown.
+          </li>
+        </ol>
+        <div>
+          <div className="eyebrow mb-2">Not yet measured — needs Customs&apos; own data</div>
+          <ul className="space-y-3">
+            {dec.pending.map((p) => (
+              <li key={p.key} className="text-[12px] leading-relaxed">
+                <div className="text-ink">{p.label}</div>
+                <div className="text-slate1">{p.why}</div>
+                <div className="text-slate2 mt-0.5"><span className="uppercase tracking-wider text-[10px] num">needs</span> {p.needs}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-rule">
+        <div className="px-5 py-3 flex items-baseline justify-between gap-4">
+          <div className="text-[13px] text-ink">Classification pairs behind the netting</div>
+          <div className="text-[11.5px] text-slate2 num">{dec.tariff_shift_count ? `${dec.tariff_shift_count} pairs with a duty-rate difference` : `${money(dec.same_rate_offset)} offset on pairs sharing one rate · no rate difference until the HS-6 tariff table is loaded`}</div>
+        </div>
+        {shifts.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="dt">
+              <thead><tr><th>Partner</th><th>Chapter</th><th>Booked short</th><th>Booked over</th><th className="!text-center">Amount</th><th className="!text-center">Duty rates</th><th className="!text-center">Duty at stake</th></tr></thead>
+              <tbody>
+                {shifts.map((x, i) => (
+                  <tr key={i} className="cursor-pointer" onClick={() => onOpenProducts?.({ partner: x.partner, chapter: x.hs2, hs4: x.under_hs4 })} title="Open the short heading product by product">
+                    <td className="whitespace-nowrap">{x.partnerName}</td>
+                    <td className="text-[12.5px]">{x.hs2} · {x.chapter}</td>
+                    <td className="num">HS {x.under_hs4}</td>
+                    <td className="num">HS {x.over_hs4}</td>
+                    <td className="text-center num">{money(x.amount)}</td>
+                    <td className="text-center num">{Math.round(x.rate_under * 100)}% → {Math.round(x.rate_over * 100)}%</td>
+                    <td className="text-center num text-gold">{money(x.duty_at_stake)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </Panel>
   );
 }

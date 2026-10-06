@@ -253,7 +253,194 @@ def estimate(corridors: list[dict], draws: int = BOOTSTRAP_DRAWS, seed: int = SE
 
 
 # --------------------------------------------------------------------------- #
-# 3. Glue                                                                      #
+# 3. Decomposition — what the gap is not, before a dollar is called lost      #
+# --------------------------------------------------------------------------- #
+#
+# The first objection a customs economist raises is that the mirror gap is
+# transit, partner over-reporting and reclassification, not evasion. The
+# answer is to take the gap apart on screen and put the revenue claim only on
+# what is left. Each step is one number a reader can click into. The steps
+# the data in hand can settle are computed here; the ones that need Customs'
+# own records are listed as pending, with what each needs.
+
+TARIFF_SHIFT_LIMIT = 60
+DECOMPOSITION_KEYS = (
+    "raw", "set_aside", "normal", "flagged_gross", "chapter_netting", "after_chapter",
+    "tariff_shift_duty", "attributable", "short_flagged", "short_offset", "short_after",
+    "same_rate_offset", "tariff_shift_count",
+)
+
+PENDING = [
+    {"key": "partner_bias", "label": "Partner reporting bias",
+     "why": "China's export-VAT rebate rewards a higher declared export value, so part of the gap is the "
+            "partner's reporting, not Lebanon's. A gap Lebanon shares with Germany or Japan on the same "
+            "heading is not a Lebanese loss.",
+     "needs": "Cover ratios for the same partner headings into control importers with strong customs "
+              "(Germany, Netherlands, Japan, Korea, Australia, Canada): six more Comtrade reporter pulls per partner."},
+    {"key": "transit", "label": "Transit to Syria and beyond",
+     "why": "China books Syria-bound cargo landed at Beirut or Tripoli as an export to Lebanon; Lebanon "
+            "records a transit, not an import. It shows as goods missing, never as low prices — the same "
+            "shape as smuggling.",
+     "needs": "Lebanese Customs transit and re-export statistics by chapter; Port of Beirut and Tripoli "
+              "monthly container series; China's exports to Syria as the dynamic test as direct routes reopen."},
+    {"key": "quantity", "label": "Under-valuation versus missing goods",
+     "why": "A declaration at 40% of value with the weight intact is under-pricing; the same 40% with the "
+            "weight missing is goods that never cleared. Comtrade carries no genuine Lebanese weights, so "
+            "the two cannot be told apart here.",
+     "needs": "Lebanese Customs' own statistics with value and net weight by HS-8 and origin, or NAJM "
+              "declaration extracts."},
+    {"key": "timing", "label": "Timing and the customs dollar",
+     "why": "A December shipment clears in January and shows as a gap in both years. Before 2023 duty was "
+            "assessed at 1,507.5 LBP to the dollar, so a dollar of gap then was worth a fraction of a "
+            "dollar of gap now.",
+     "needs": "2019–2024 bulk files for three-year centred averages, and the customs exchange rate by year."},
+]
+
+
+def _pot(c: dict) -> float:
+    """Fiscal exposure if a corridor's whole positive gap were lost — before any exclusion."""
+    return max(c["gap"], 0.0) * (VAT_RATE + c["duty_rate"])
+
+
+def _waterfall(group: list[dict]) -> tuple[dict, list[dict]]:
+    """One partner-year: the steps, and the heading pairs behind the chapter netting."""
+    raw = sum(_pot(c) for c in group)
+    set_aside = sum(_pot(c) for c in group if c["signature"] in ("exempt", "structural"))
+    normal = sum(_pot(c) for c in group if c["signature"] == "normal")
+    flagged = sum(c["fiscal_loss"] for c in group if c["signature"] in FLAGGED)
+
+    chapters: dict[str, list[dict]] = defaultdict(list)
+    for c in group:
+        if c["signature"] not in ("exempt", "structural"):
+            chapters[c["hs2"]].append(c)
+
+    after = 0.0
+    short_flagged = short_offset = 0.0
+    same_rate = 0.0
+    pairs: list[dict] = []
+    for hs2, cs in sorted(chapters.items()):
+        under = sorted((c for c in cs if c["signature"] in FLAGGED), key=lambda c: -c["shortfall"])
+        if not under:
+            continue
+        u_short = sum(c["shortfall"] for c in under)
+        # The other side of the same chapter: headings that read "Lebanon declares
+        # more" (cover 160% and above) or that the partner never reports at all.
+        # Surpluses inside ordinary asymmetry are noise, and the reflected tail
+        # already corrects for noise; netting against them would count it twice.
+        over = sorted((c for c in cs if c["signature"] in ("over_invoicing", "not_in_partner") and c["m"] > c["x_cif"]),
+                      key=lambda c: -(c["m"] - c["x_cif"]))
+        surplus = sum(c["m"] - c["x_cif"] for c in over)
+        offset = min(u_short, surplus)
+        residual = u_short - offset
+        rate = sum(c["shortfall"] * c["duty_rate"] for c in under) / u_short
+        after += residual * (VAT_RATE + rate)
+        short_flagged += u_short
+        short_offset += offset
+
+        # Which headings offset which: greedy, largest against largest, until the
+        # offset is spent. A pair on the same duty rate cancels to nothing; a pair
+        # where goods moved to a cheaper heading leaves the duty difference.
+        i = j = 0
+        ru = under[0]["shortfall"]
+        ro = (over[0]["m"] - over[0]["x_cif"]) if over else 0.0
+        left = offset
+        while left > 1.0 and i < len(under) and j < len(over):
+            a = min(ru, ro, left)
+            du, do = under[i]["duty_rate"], over[j]["duty_rate"]
+            if abs(du - do) < 1e-9:
+                same_rate += a
+            else:
+                pairs.append({
+                    "hs2": hs2, "chapter": CHAPTERS.get(hs2, f"Chapter {hs2}"),
+                    "under_hs4": under[i]["hs4"], "over_hs4": over[j]["hs4"],
+                    "amount": round(a, 2), "rate_under": du, "rate_over": do,
+                    "duty_at_stake": round(max(0.0, a * (du - do)), 2),
+                })
+            ru -= a; ro -= a; left -= a
+            if ru <= 1e-6:
+                i += 1
+                ru = under[i]["shortfall"] if i < len(under) else 0.0
+            if ro <= 1e-6:
+                j += 1
+                ro = (over[j]["m"] - over[j]["x_cif"]) if j < len(over) else 0.0
+
+    tariff_duty = sum(x["duty_at_stake"] for x in pairs)
+    steps = {
+        "raw": round(raw, 2), "set_aside": round(set_aside, 2), "normal": round(normal, 2),
+        "flagged_gross": round(flagged, 2),
+        "chapter_netting": round(flagged - after, 2), "after_chapter": round(after, 2),
+        "tariff_shift_duty": round(tariff_duty, 2), "attributable": round(after + tariff_duty, 2),
+        "short_flagged": round(short_flagged, 2), "short_offset": round(short_offset, 2),
+        "short_after": round(short_flagged - short_offset, 2),
+        "same_rate_offset": round(same_rate, 2), "tariff_shift_count": len(pairs),
+    }
+    return steps, pairs
+
+
+def decompose(corridors: list[dict]) -> dict:
+    """The waterfall per year and partner; writes meta.decomposition."""
+    by_year: dict[int, list[dict]] = defaultdict(list)
+    for c in corridors:
+        by_year[c["year"]].append(c)
+    years = {}
+    for year, rows in sorted(by_year.items()):
+        by_partner: dict[int, list[dict]] = defaultdict(list)
+        for c in rows:
+            by_partner[c["partner"]].append(c)
+        totals = {k: 0.0 for k in DECOMPOSITION_KEYS}
+        partners = {}
+        shifts = []
+        for p, grp in sorted(by_partner.items()):
+            steps, pairs = _waterfall(grp)
+            partners[str(p)] = {"name": COUNTRY.get(p, str(p)), **steps}
+            for k in DECOMPOSITION_KEYS:
+                totals[k] += steps[k]
+            shifts.extend({"partner": p, "partnerName": COUNTRY.get(p, str(p)), **x} for x in pairs)
+        shifts.sort(key=lambda x: (-x["duty_at_stake"], -x["amount"]))
+        years[str(year)] = {
+            **{k: round(v, 2) for k, v in totals.items()},
+            "tariff_shift_count": int(totals["tariff_shift_count"]),
+            "partners": partners,
+            "tariff_shift": shifts[:TARIFF_SHIFT_LIMIT],
+        }
+    return {
+        "method": "waterfall",
+        "note": (
+            "Every positive HS-4 gap, in VAT-and-duty terms, is taken apart step by step: exempt and one-sided "
+            "headings are set aside; corridors within ordinary asymmetry (85-160% cover) are left out; what remains "
+            "is the flagged gross. Within each HS-2 chapter the flagged shortfall is then offset by what Lebanon "
+            "books above the partner on the chapter's headings that read 'Lebanon declares more' or that the "
+            "partner never reports (reclassification; surpluses inside ordinary asymmetry are left to the "
+            "reflected tail, so noise is not counted twice), and the duty difference "
+            "on pairs that moved to a cheaper heading is added back. What is left is customs-attributable by the "
+            "current method - before partner reporting bias, transit and timing, which need Customs' own data and "
+            "are listed as pending. Duty rates are chapter bands until the HS-6 tariff table is loaded, so every "
+            "pair inside a chapter carries the same rate today and duty_at_stake is zero; the pairs are still the "
+            "classification audit list. The reflected-tail figure in meta.estimate is a second, independent "
+            "reading of the same flagged gross."
+        ),
+        "pending": PENDING,
+        "computed": date.today().isoformat(),
+        "years": years,
+    }
+
+
+def _merge_decomposition(est: dict, dec: dict) -> None:
+    """Put the waterfall beside the reflected tail, so one object carries both methods."""
+    for y, yv in dec["years"].items():
+        ey = est["years"].get(y)
+        if not ey:
+            continue
+        for k in DECOMPOSITION_KEYS:
+            ey[k] = yv[k]
+        for p, pv in yv["partners"].items():
+            if p in ey["partners"]:
+                for k in DECOMPOSITION_KEYS:
+                    ey["partners"][p][k] = pv[k]
+
+
+# --------------------------------------------------------------------------- #
+# 4. Glue                                                                      #
 # --------------------------------------------------------------------------- #
 
 def _summarise(rows: list[dict]) -> dict:
@@ -276,10 +463,13 @@ def run(gaps: dict, hs6: dict) -> dict:
         per_year[str(y)]["comparable"] = _summarise([c for c in rows if c["partner"] in comparable])
 
     est = estimate(corridors)
+    dec = decompose(corridors)
+    _merge_decomposition(est, dec)
     corridors.sort(key=lambda c: (-c["year"], -abs(c["gap"])))
 
     meta = dict(gaps["meta"])
     meta["estimate"] = est
+    meta["decomposition"] = dec
     meta["signatures"] = {**meta.get("signatures", {}), "not_in_partner": "Only in Lebanon's books"}
     meta["signatures"].pop("smuggling_risk", None)
     meta["corridor_rule"] = (
@@ -304,6 +494,16 @@ def report(payload: dict) -> None:
     for y, v in ys.items():
         print(f"{y}: corridors {v['corridors']}  structural {v['structural']['count']}  "
               f"not_in_partner {v['not_in_partner']['count']}  fiscal ${v['fiscal_loss']/1e6:.1f}M")
+    dec = payload["meta"]["decomposition"]["years"]
+    for y, v in dec.items():
+        print(f"{y}: waterfall  before adjustment ${v['raw']/1e6:.1f}M  - set aside ${v['set_aside']/1e6:.1f}M  "
+              f"- ordinary asymmetry ${v['normal']/1e6:.1f}M  = flagged ${v['flagged_gross']/1e6:.1f}M  "
+              f"- reclassification ${v['chapter_netting']/1e6:.1f}M  + tariff shift ${v['tariff_shift_duty']/1e6:.1f}M  "
+              f"= attributable ${v['attributable']/1e6:.1f}M   ({v['tariff_shift_count']} pairs with a rate difference)")
+        for p, s in v["partners"].items():
+            share = s["short_offset"] / s["short_flagged"] if s["short_flagged"] else 0.0
+            print(f"     {s['name']:14s} shortfall ${s['short_flagged']/1e6:6.1f}M, offset within chapter "
+                  f"${s['short_offset']/1e6:6.1f}M ({share:.0%}) -> attributable ${s['attributable']/1e6:6.1f}M")
 
 
 def main() -> None:
